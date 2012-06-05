@@ -1,10 +1,59 @@
 from numpy import *
+import time
+import copy
+import random as stdrandom
 import scipy.cluster.hierarchy as sch
 from scipy.sparse.extract import find
 from scipy.sparse import lil_matrix
 import scipy.stats
 import log
 import pdb
+
+"""
+Used for medoid and clarans like clusterings; see clarans paper for details
+m -- The current medoid
+p -- The candidate new medoid
+objects -- The objects to cluster
+cost -- The cost funciton
+"""
+def _swap_cost(objects, m, p, assignments, medoids, cost):
+    tcmp = 0
+    nassignments = [0]*len(objects)
+    for j, a in enumerate(assignments):
+	if a == m:
+	    mincost = float('inf')
+	    j2 = -1
+	    for m2 in medoids:
+		if m2 != m and mincost > cost(objects[m2], objects[j]):
+		    j2 = m2
+		    mincost = cost(objects[m2], objects[j])
+	    if cost(objects[j], objects[p]) >= cost(objects[j], objects[j2]):
+		tcmp += cost(objects[j2], objects[j]) - cost(objects[j], objects[m])
+		nassignments[j] = j2
+	    else:
+		tcmp += cost(objects[p], objects[j]) - cost(objects[j], objects[m])
+		nassignments[j] = p
+	else:
+	    if cost(objects[j], objects[a]) > cost(objects[j], objects[p]):
+		tcmp += cost(objects[j], objects[p]) - cost(objects[j], objects[a])
+		nassignments[j] = p
+	    else:
+		nassignments[j] = a
+    return tcmp, nassignments
+
+def _assign(objects, medoids, cost):
+    assgn = [0]*len(objects)
+    tcost = 0
+    for i, o in enumerate(objects):
+	mincost = float('inf')
+	for j in medoids:
+	    c = cost(o, objects[j])
+	    if c < mincost:
+		mincost = c
+		assgn[i] = j
+	tcost += mincost
+    return tcost, assgn
+
 
 
 def choose_clusters_by_partition_density(Z, start, end, step, criterion='inconsistent', edges=[]):
@@ -38,16 +87,77 @@ def choose_clusters_by_partition_density(Z, start, end, step, criterion='inconsi
 	    pickedclusts = C
     return pickedclusts
 		    
+
+def kmedoids(objects, k, cost):
+    indices = range(len(objects))
+    medoids = stdrandom.sample(indices, k)
+    currcost, assignments = _assign(objects, medoids, cost)
+    for j in medoids:
+	change = False
+	for i, o in enumerate(objects):
+	    totcost = 0
+	    for l, a in enumerate(assignments):
+		if a == j:
+		    totcost += cost(o, objects[l])
+		else:
+		    totcost += cost(objects[j], objects[l])
+	    if currcost > totcost:
+		currcost = totcost
+		medoids[medoids.index(j)] = i
+		for l, a in enumerate(assignments):
+		    if a == j:
+			assignments[l] = i
+		j = i
+		change = True
+	if not change:
+	    break
+    return medoids, assignments
+
+
+def clarans(objects, k, cost, maxneighbor=-1, numlocal=2):
+    start = time.clock()
+    n = len(objects)
+    indices = range(n)
+    medoids = stdrandom.sample(indices, k)
+    bestmedoids = copy.copy(medoids)
+    currcost, assignments = _assign(objects, medoids, cost)
+    if maxneighbor < 0:
+	maxneighbor = n/50
+    i = 1
+    j = 1
+    mincost = float('inf')
+    while i <= numlocal:
+	while j <= maxneighbor:
+	    m = stdrandom.choice(medoids)
+	    p = m
+	    while p == m:
+		p = stdrandom.choice(indices)
+	    sc, nassignments = _swap_cost(objects, m, p, assignments, medoids, cost)
+	    if sc < 0:
+		medoids[medoids.index(m)] = p
+		currcost = currcost + sc
+		assignments = nassignments
+		j = 1
+	    else:
+		j += 1
+	if mincost > currcost:
+            bestmedoids = medoids
+	i += 1
+    print 'Elapsed %s' % (time.clock() - start)
+    return bestmedoids, assignments
+        
+
+
+   
 	
 def topological_overlap_matrix(M):
     nelems = shape(M)[0]
     res = zeros([nelems, nelems])
     print 'Precomputing N matrix'
-    N = M != 0
     print 'Done precomputing, doing rest of computation'
     for i in range(nelems):
 	for j in range(i, nelems):
-	    res[i,j] = (logical_and(N[i,:], N[j,:]).sum() + M[i,j])/(min(N[i,:].sum(), N[j,:].sum()) + 1)
+	    res[i,j] = (dot(M[i,:], M[j,:]) - M[i,j]*M[j,j] - M[i,i]*M[i,j] + M[i,j])/(min(M[i,:].sum(), M[j,:].sum()) + 1)
 	    res[j,i] = res[i,j]
     return res
 
@@ -67,14 +177,32 @@ def sampling_sparsifier_Kn(M, gamma):
 def threshold(Mcorr, sthresh, hthresh):
     nelems = shape(Mcorr)[0]
     rows, cols, dat = find(Mcorr >= hthresh)
-    return abs(Mcorr**sthresh), zip(rows, cols)
+    Mthresh = abs(Mcorr)
+    Mthresh[Mthresh < hthresh] = 0
+    return Mthresh**sthresh, zip(rows, cols)
+
+
+def link_communities_dissimilarity(e1, e2, TOM):
+    i, k = e1
+    j, kprime = e2
+    if k == kprime:
+	return TOM[i, j]
+    elif i == j:
+	return TOM[k, kprime]
+    elif i == kprime:
+	return TOM[k, j]
+    elif j == k:
+	return TOM[i, kprime]
+    else:
+	return 0
+
 
 def link_communities_matrix_by_TOM(M, edges):
     nelems = shape(M)[0]
     nlinks = len(edges)
     res = zeros([nlinks, nlinks])
     log.write_and_close('Calculating TOM matrix')
-    TOM = topological_overlap_matrix(M)
+    TOM = topological_overlap_matrix(abs(M))
     prevprog = -1
     for l in range(nlinks):
 	prog = int(float(l)/nlinks * 100)
@@ -82,14 +210,7 @@ def link_communities_matrix_by_TOM(M, edges):
 	    log.write_and_close('%s %%' % prog)
             prevprog = prog
 	for m in range(l, nlinks):
-	    i, k = edges[l]
-	    j, kprime = edges[m]
-	    if not kprime == k:
-		if j == k:
-		    j = kprime
-		else:
-		    continue
-	    res[l, m] = TOM[i, j]
+	    res[l, m] = link_communities_dissimilarity(edges[l], edges[m], TOM)
 	    res[m, l] = res[l, m]
     return res
 
@@ -182,10 +303,14 @@ def get_degrees(edges):
 		degrees[n] += 1
     return degrees
 
-def preservation_metric(clusteredges, networkedges):
+def preservation_metric(clusteredges, networkedges, by_edges=False):
     degrees = get_degrees(clusteredges)
     vec1 = degrees.values()
-    vec2 = [sum([1 for m in degrees if (n,m) in networkedges or (m,n) in networkedges]) for n in degrees]
+    if by_edges:
+	degrees2 = get_degrees([e for e in clusteredges if e in networkedges or (e[1],e[0]) in networkedges])
+	vec2 = [degrees2[n] if n in degrees2 else 0 for n in degrees]
+    else:
+	vec2 = [sum([1 for m in degrees if (n,m) in networkedges or (m,an) in networkedges]) for n in degrees]
     return scipy.stats.pearsonr(vec1, vec2)
 	    
     
