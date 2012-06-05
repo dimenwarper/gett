@@ -1,6 +1,6 @@
 import sys
 import pdb
-import utils
+from ett import utils
 import pickle
 from optparse import OptionParser
 from numpy import *
@@ -31,7 +31,8 @@ genotyped_samples =[l.strip() for l in gensamplesfile.readlines()]
 exp_samples = genfile.readline().strip().split('\t') 
 order = []
 for i, s in enumerate(genotyped_samples):
-    order.append(exp_samples.index(s))
+    if s in exp_samples:
+	order.append(exp_samples.index(s))
 
 line= genfile.readline()
 clusterids = []
@@ -46,11 +47,20 @@ eigenmat = array(eigenmat)
 
 genmat = []
 
+genmat_genids = []
+genorder = []
 for line in genmatfile.readlines():
     fields = line.strip().split(' ')
-    if fields[0] in exp_samples:
+    if fields[0] in genotyped_samples and fields[0] in exp_samples:
         genmat.append([float(d) for d in fields[options.skipfields:]])
+        genmat_genids.append(fields[0])
 
+for i,s, in enumerate(genotyped_samples):
+    if s in genmat_genids:
+	genorder.append(genmat_genids.index(s))
+
+eigenmat_genids = [exp_samples[i] for i in order]
+genmat_genids = [genmat_genids[i] for i in genorder]
 genmat = array(genmat)
 
 snps = [l.strip() for l in snpfile.readlines()]
@@ -64,7 +74,7 @@ else:
 for i in iterrange:
     lasso = Lasso(alpha=options.alpha)
     print 'Doing %s' % i
-    lasso.fit(genmat, eigenmat[i,:])
+    lasso.fit(genmat[genorder, :], eigenmat[i,:])
     print lasso
     print lasso.coef_.max()
     coefs = array(lasso.coef_)

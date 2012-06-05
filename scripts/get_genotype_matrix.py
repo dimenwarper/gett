@@ -2,11 +2,11 @@ import sys
 import pdb
 from optparse import OptionParser
 
-parser = OptionParser('usage: python %prog genotypefile.ped snpfile.bim idfile snpfile outfile')
+parser = OptionParser('usage: python %prog genotypefile.ped snpfile.bim outfile')
 parser.add_option('-i', '--idfile', dest='idfile', help='A file that specifies sample ids to be counted in the genotype matrix,\
                                                          one for each row. Default is all samples are taken into account.')
-parser.add_option('-s', '--snpidfile', dest='snpidfile', help='A file that specifies sample ids to be counted in the genotype matrix,\
-                                                         one for each row. Default is all samples are taken into account.')
+parser.add_option('-s', '--snpidfile', dest='snpidfile', help='A file that specifies SNPs to be counted in the genotype matrix,\
+                                                         one for each row. Default is all SNPs are taken into account.')
 parser.add_option('-f', '--skipfields', dest='skipfields', type='int', default=6,  help='Number of fields to skip before beginning of genotype values in \
 										genotypefile.ped')
 (options, args) = parser.parse_args()

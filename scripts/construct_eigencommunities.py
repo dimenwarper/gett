@@ -58,9 +58,10 @@ for i, c in enumerate(uc):
     indices = array(list(nodesbycluster[c]))
     if len(indices) >= options.clustercutoff:
 	clusterfile.write('%s:size:%s\t' % (c, len(indices)) + '\t'.join([geneorder[idx] for idx in indices]) + '\n')
-	Mgexpprime = Mgexp[indices,:]
-	E = linalg.svd(Mgexpprime)[2][0]
-	eigenexpfile.write('%s\t' % c + '\t'.join([str(f) for f in E]) + '\n')
+	Mgexpprime = Mgexp[indices,:].T
+	U, D, V = linalg.svd(Mgexpprime)
+	print 'Variance explained for 1st component of cluster %s: %s' % (c, D[0]/sum(D))
+	eigenexpfile.write('%s\t' % c + '\t'.join([str(f) for f in D[0]*U[:, 0]]) + '\n')
     else:
 	#print 'Skipping cluster %s of size %s < %s (cutoff)' % (c, len(indices), options.clustercutoff) 
 	pass
