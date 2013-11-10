@@ -10,6 +10,8 @@ parser.add_argument('communityfile', metavar='COMMUNITY_FILE', type=argparse.Fil
 parser.add_argument('genmatfile', metavar='GENOTYPE_MATRIX_FILE', type=argparse.FileType('r'))
 parser.add_argument('regressedfile', metavar='REGRESSED_SNPS_FILE', type=argparse.FileType('r'))
 parser.add_argument('snpfile', metavar='SNP_BIM_FILE', type=argparse.FileType('r'))
+parser.add_argument('--skip', type=int, help='Number of columns to skip when parsing genotype matrix', default=6)
+parser.add_argument('--minsnps', metavar='MIN_NUM_SNPS', type=int, help='Minimum number of SNPs that a module must have to be directed', default=5)
 parser.add_argument('outfile', metavar='OUT_FILE', type=argparse.FileType('w'))
 
 args = parser.parse_args()
@@ -29,9 +31,8 @@ while line:
     fields = line.strip().split('\t')
     restrict_snps[float(fields[0])] = [snpdict[f.split(':')[0]] for f in fields[1:] if f.split(':')[0] in snpdict]
     line = args.regressedfile.readline()
-
 print 'Parsing genotype matrix file'
-labels, Mgen = ett.io.read_genotype_matrix(args.genmatfile)
+labels, Mgen = ett.io.read_genotype_matrix(args.genmatfile, skip_fields=args.skip)
 indices = [i for i, l in enumerate(labels) if l[0] in samples]
 Mgen = Mgen[indices, :]
 print 'Calculating directionality' 
@@ -39,8 +40,8 @@ indices = [samples.index(l[0]) for l in labels if l[0] in samples]
 for c, edges in communities.iteritems():
     if len(nodesbycommunity[c]) >= 5:
 	print 'Doing %s with length %s' % (c, len(nodesbycommunity[c]))
-	if c in restrict_snps:
-            print '%s is in coefficient file' % c
+	if c in restrict_snps and len(restrict_snps[c]) >= args.minsnps:
+            print '%s is in coefficient file and has %s SNPs' % (c, len(restrict_snps[c]))
 	    new_edges = causality.direct_edges(Mexp[:, indices], edges, Mgen, restrict_snps=restrict_snps[c])
             print len(new_edges)
 	    for e in new_edges:

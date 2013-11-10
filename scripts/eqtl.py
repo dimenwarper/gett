@@ -5,12 +5,14 @@ import pickle
 from optparse import OptionParser
 from numpy import *
 from sklearn.linear_model import Lasso
+from sklearn.linear_model import LassoCV
 
 usage = 'usage: python %prog [options] gene_exp_file genotype_matrix_file snp_file genotyped_samples_file output_file'
 parser = OptionParser(usage)
-parser.add_option('-a', '--alpha', dest='alpha', default=0.1, type='float')
+parser.add_option('-a', '--alpha', dest='alpha', default=0, type='float')
 parser.add_option('-s', '--start', dest='runstart', default=0, type='int')
 parser.add_option('-e', '--stop', dest='runstop', default=0, type='int')
+parser.add_option('-c', '--cv', dest='cv', default=0, type='int', help='Perform regressions with cross validation to find regularization parameter')
 parser.add_option('-k', '--skipfields', dest='skipfields', default=6, type='int')
 
 options, args = parser.parse_args()
@@ -62,7 +64,6 @@ for i,s, in enumerate(genotyped_samples):
 eigenmat_genids = [exp_samples[i] for i in order]
 genmat_genids = [genmat_genids[i] for i in genorder]
 genmat = array(genmat)
-
 snps = [l.strip() for l in snpfile.readlines()]
 
 print 'Finished reading files...'
@@ -72,11 +73,14 @@ if options.runstart == 0 and options.runstop == 0:
 else:
     iterrange = range(options.runstart, options.runstop)
 for i in iterrange:
-    lasso = Lasso(alpha=options.alpha)
+    if options.alpha != 0:
+	lasso = Lasso(alpha=options.alpha)
+    else:
+	lasso = LassoCV(cv=options.cv)
     print 'Doing %s' % i
     lasso.fit(genmat[genorder, :], eigenmat[i,:])
-    print lasso
-    print lasso.coef_.max()
     coefs = array(lasso.coef_)
     indices = abs(coefs).argsort()[::-1]
+    print 'Max coeff: %s' % coefs.max()
+    print 'Params: %s' % lasso
     resultfile.write('%s\t' % clusterids[i] +'\t'.join(['%s:%s' % (snp, coeff) for snp, coeff in zip([snps[i] for i in indices], coefs[indices]) if coeff != 0.]) + '\n')

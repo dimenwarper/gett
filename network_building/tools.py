@@ -8,6 +8,7 @@ from scipy.sparse import lil_matrix
 import scipy.stats
 import log
 import pdb
+import numpy as np
 
 """
 Used for medoid and clarans like clusterings; see clarans paper for details
@@ -197,21 +198,30 @@ def link_communities_dissimilarity(e1, e2, TOM):
 	return 0
 
 
-def link_communities_matrix_by_TOM(M, edges):
+def link_communities_matrix_by_TOM(M, edges, squareform=False):
     nelems = shape(M)[0]
     nlinks = len(edges)
-    res = zeros([nlinks, nlinks])
+    if squareform:
+	res = zeros(nlinks*(nlinks - 1)/2)
+    else:
+        res = zeros([nlinks, nlinks])
     log.write_and_close('Calculating TOM matrix')
     TOM = topological_overlap_matrix(abs(M))
     prevprog = -1
+    if not squareform:
+	for l in range(nlinks):
+	    res[l, l] = 1
     for l in range(nlinks):
 	prog = int(float(l)/nlinks * 100)
 	if (prog % 10 == 0 or l == 0) and prog != prevprog:
 	    log.write_and_close('%s %%' % prog)
             prevprog = prog
-	for m in range(l, nlinks):
-	    res[l, m] = link_communities_dissimilarity(edges[l], edges[m], TOM)
-	    res[m, l] = res[l, m]
+	for m in range(l + 1, nlinks):
+	    if squareform:
+		res[nlinks * l - (l*(l+1)/2) + m - l -1] = 1 - abs(link_communities_dissimilarity(edges[l], edges[m], TOM))
+	    else:
+		res[l, m] = link_communities_dissimilarity(edges[l], edges[m], TOM)
+		res[m, l] = res[l, m]
     return res
 
 def weighted_link_communities_matrix(M, edges):
@@ -313,4 +323,18 @@ def preservation_metric(clusteredges, networkedges, by_edges=False):
 	vec2 = [sum([1 for m in degrees if (n,m) in networkedges or (m,an) in networkedges]) for n in degrees]
     return scipy.stats.pearsonr(vec1, vec2)
 	    
-    
+def entropy(data, nbins):
+    n, bins = histogram(data.ravel(), nbins)
+    n = n.astype(float_)
+    n = take(n, nonzero(n)[0])         # get the positive
+    p = n/data.size
+    delta = bins[1]-bins[0]
+    S = -1.0*sum(p*np.log(p))
+    return S/np.log(data.size + 1)
+
+def graph_entropy(Mweight, nbins, clusteredges=[]):
+    if len(clusteredges) > 0:
+        return nan #TODO need to consider the case when we specify which edges to take into account
+    else:
+        return entropy(Mweight, nbins)
+

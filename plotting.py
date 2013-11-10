@@ -6,6 +6,7 @@ from itertools import groupby, cycle
 import pdb
 from operator import itemgetter
 from matplotlib import pyplot as plt
+from matplotlib import patches
 import numpy as np
 
 def _gen_data(fhs, columns, sep):
@@ -79,3 +80,58 @@ def manhattan(data, ax, apply_on_values=lambda x:x, colors='bk', sep='\t', lines
     if ymax is not None: plt.ylim(ymax=ymax)
     plt.xticks([c[1] for c in xs_by_chr], [c[0] for c in xs_by_chr], rotation=-90, size=8.5)
 
+def netQTLplot(hubs, hub_connections, all_snps, data, ax, colors='bk', hub_color='red', nohubpos=False):
+    all_snps_grouped = groupby(all_snps, key=itemgetter(0))
+    last_x = 0
+    xs_by_chr = {}
+    offset_by_chr = {}
+    colors_by_chr = {}
+    colors = cycle(colors)
+    chroms = []
+    for chrom, poslist in all_snps_grouped:
+        chroms.append(chrom)
+        colors_by_chr[chrom] = colors.next()
+        poslist = list([p[1] for p in poslist])
+        mx = max(poslist)
+        mn = min(poslist)
+        med = last_x + (mx - mn)/2
+        xs_by_chr[chrom] = med
+        offset_by_chr[chrom] = last_x + mn
+        last_x += mx
+    plt.xlim(0, last_x)
+    if nohubpos:
+        hub_rad = 0.5
+        data_rad = 0.1
+        hub_pos = dict([(h[0], i+1) for i, h in enumerate(hubs)])
+    else:
+        hub_rad = last_x * 0.003
+        data_rad = last_x * 0.0004
+        plt.ylim(0, last_x)
+        hub_pos = dict([(name, offset_by_chr[chrom] + pos) for name, chrom, pos, val in hubs])
+    # Draw data
+    for chrom, pos, hub, val in data:
+        coord = (offset_by_chr[chrom] + pos, hub_pos[hub])
+        data_circle = patches.Circle(coord, radius=data_rad*val, color=colors_by_chr[chrom], linewidth=0)
+        ax.add_artist(data_circle)
+    # Draw links between hubs
+    for hub1, hub2, color in hub_connections:
+        pos1 = hub_pos[hub1]
+        pos2 = hub_pos[hub2]
+        mnpos = min(pos1, pos2)
+        height = abs(pos2 - pos1)
+        arc = patches.Arc((0, mnpos + height/2), height/5, height, theta1=90, theta2=270, color=color, linewidth=0.5)
+        arc.set_clip_on(False)
+        ax.add_artist(arc)
+    # Draw hubs
+    for name, chrom, pos, val in hubs:
+        center = (1, hub_pos[name])
+        hub_circle = patches.Circle(center, radius=hub_rad*val, color=hub_color, linewidth=0)
+        hub_circle.set_clip_on(False)
+        ax.add_artist(hub_circle)
+    plt.xticks([xs_by_chr[c] for c in chroms], [c for c in chroms], rotation=-90, size=8.5)
+    if nohubpos:
+        pass
+        #ax.axes.get_yaxis().set_visible(False)
+    else:
+        plt.yticks([xs_by_chr[c] for c in chroms], [c for c in chroms], size=8.5)
+    plt.show()

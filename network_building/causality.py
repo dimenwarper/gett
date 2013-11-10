@@ -25,8 +25,9 @@ def direct_edges(Mexp, edges, Mgen, restrict_snps=[]):
 	l_g1_g2 = 0
 	l_g2_g1 = 0
         for i in snps[:500]:
-	    l_g1_g2 += log(P(arctanh(parcorr(Mexp[g2, :], Mgen[:, i], array([Mexp[g1, :]]).T))))
-	    l_g2_g1 += log(P(arctanh(parcorr(Mexp[g1, :], Mgen[:, i], array([Mexp[g2, :]]).T))))
+            if True or i < Mgen.shape[1]:
+		l_g1_g2 += log(P(arctanh(parcorr(Mexp[g2, :], Mgen[:, i], array([Mexp[g1, :]]).T))))
+		l_g2_g1 += log(P(arctanh(parcorr(Mexp[g1, :], Mgen[:, i], array([Mexp[g2, :]]).T))))
 	# Right now, just take the log ratios and compare them. Rigorously, the ratio follows
 	# a chi squared statistic and we could report causality with confidence.
 	if (l_g1_g2 - l_g2_g1) < 0:

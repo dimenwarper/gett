@@ -1,4 +1,5 @@
 from numpy import * 
+from collections import defaultdict
 import pdb
 
 def read_genotype_matrix(genmatfile, skip_fields=6, sep=' ', restrict_samples=[]):
@@ -13,18 +14,37 @@ def read_genotype_matrix(genmatfile, skip_fields=6, sep=' ', restrict_samples=[]
 	line = genmatfile.readline()
     return labels, array(genmat)
 
-def read_expression_matrix(expfile, sep='\t'):
+def read_expression_matrix(expfile, sep='\t', get_rid_of_NAs=False, merge_same_ids=False):
     header = expfile.readline().strip().split(sep)
     genenames = []
     Mexp = []
     line = expfile.readline()
+    numfields = len(line.strip().split(sep))
     while line:
 	fields = line.strip().split(sep)
-	genenames.append(fields[0])
-	a = [float(f) for f in fields[1:]]
-	Mexp.append(a)
+	a = [float("nan") if f == 'NA' else float(f) for f in fields[1:]]
+        if a:
+            Mexp.append(a)
+            genenames.append(fields[0])
 	line = expfile.readline()
-    return header, genenames, array(Mexp)
+    Mexp = array(Mexp)
+    if get_rid_of_NAs:
+        good_cols = [i for i in range(Mexp.shape[1]) if sum(isnan(Mexp[:,i])) == 0 ] 
+	Mexp = Mexp[:, good_cols]
+    else:
+	Mexp = nan_to_num(Mexp)
+    if merge_same_ids:
+        gindices = defaultdict(list)
+        for i, g in enumerate(genenames):
+            gindices[g].append(i)
+        true_size = len(gindices)
+        new_Mexp = zeros([true_size, Mexp.shape[1]])
+        for i, g in enumerate(gindices):
+            new_Mexp[i,:] = median(Mexp[gindices[g],:], axis=0)
+        del(Mexp)
+        Mexp = new_Mexp
+        genenames = gindices.keys()
+    return header, genenames, Mexp
 
 def read_community(communityfile, sep='\t'):
     nodesbycluster = {}
@@ -63,22 +83,31 @@ def write_dict(outfile, d, split_lists=False, sep='\t'):
 
 def read_dict(dfile, numfieldsid=1, apply_for_keys=lambda x: x, apply_for_values=lambda x:x):
     d = {}
+    header = dfile.readline().strip().split('\t')
     line = dfile.readline()
     while line:
 	fields = line.strip().split('\t')
 	if numfieldsid > 1:
 	    d[tuple(apply_for_keys(fields[:numfieldsid]))] = apply_for_values(fields[numfieldsid:])
+        else:
+	    d[apply_for_keys(fields[0])] = apply_for_values(fields[numfieldsid:])
         line = dfile.readline()
-    return d
+    return header, d
 
-def snp2coordinate(snp_coordinate_file):
+def snp2coordinate(snp_coordinate_file, getlist=False):
     snp2coordinates = {}
     line = snp_coordinate_file.readline()
+    snplist = []
     while line:
 	fields = line.strip().split('\t')
+        if getlist:
+            snplist.append((fields[0].replace('23', 'X'), int(fields[3])))
 	snp2coordinates[fields[1]] = (fields[0].replace('23', 'X'), int(fields[3]))
 	line = snp_coordinate_file.readline()
-    return snp2coordinates
+    if getlist:
+        return snp2coordinates, snplist
+    else:
+        return snp2coordinates
 
 def parse_coeff_file(coefficient_file, snp2coordinates):
     coeffs = {}
@@ -105,8 +134,16 @@ def parse_coeff_file(coefficient_file, snp2coordinates):
 	line = coefficient_file.readline()
     return coeffs, coeff_labels, coeff_snpids, coeffs_in_coords
 
-
-
-
-
-
+def read_coord_file(f, delim='\t', chrcol=0, poscol=1, endcol=None):
+    line = f.readline()
+    coords = defaultdict(list)
+    while line:
+	fields = line.strip().split(delim)
+	if not endcol:
+	    chrom = fields[chrcol].upper().replace('CHR','')
+	    coords[chrom].append(int(fields[poscol]))
+	else:
+	    chrom = fields[chrcol].upper().replace('CHR','')
+	    coords[chrom].append([int(fields[poscol]), int(fields[endcol])])
+	line = f.readline()
+    return coords

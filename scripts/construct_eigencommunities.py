@@ -16,7 +16,7 @@ parser.add_option('-c', '--clustercutoff', dest='clustercutoff', default=0, type
 gexpfile = open(args[0])
 communityfile = open(args[1])
 eigenexpfile = open(args[2], 'w')
-clusterfile = open(args[0] + '.community_clusters', 'w')
+clusterfile = open(args[2] + '.community_clusters', 'w')
 
 print 'Writing sample order file'
 header = gexpfile.readline()
@@ -52,16 +52,16 @@ for line in communityfile.readlines():
 
 clusters = array(clusters)
 uc = unique(clusters)
+eigenexpfile.write(header)
 print 'Getting eigencommunities'
 for i, c in enumerate(uc):
     #print 'cluster %s of %s' % (i + 1, len(uc))
     indices = array(list(nodesbycluster[c]))
     if len(indices) >= options.clustercutoff:
 	clusterfile.write('%s:size:%s\t' % (c, len(indices)) + '\t'.join([geneorder[idx] for idx in indices]) + '\n')
-	Mgexpprime = Mgexp[indices,:].T
-	U, D, V = linalg.svd(Mgexpprime)
-	print 'Variance explained for 1st component of cluster %s: %s' % (c, D[0]/sum(D))
-	eigenexpfile.write('%s\t' % c + '\t'.join([str(f) for f in D[0]*U[:, 0]]) + '\n')
+	Mgexpprime = Mgexp[indices,:]
+	E = linalg.svd(Mgexpprime)[2][0]
+	eigenexpfile.write('%s\t' % c + '\t'.join([str(f) for f in E]) + '\n')
     else:
 	#print 'Skipping cluster %s of size %s < %s (cutoff)' % (c, len(indices), options.clustercutoff) 
 	pass

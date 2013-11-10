@@ -2,7 +2,6 @@ import matplotlib
 matplotlib.use('Agg')
 import scipy.cluster.hierarchy as sch
 import fastcluster
-from ett.cluster_tools import show_heatmap
 import os.path
 import sys
 import pdb
@@ -26,9 +25,9 @@ parser.add_argument('--k', type=int, default=-1, help='Number of clusters. Ignor
 parser.add_argument('--outname', type=str, default='', help='Name to pre-append to output files.')
 
 args = parser.parse_args()
-samples, genes, M = ett.io.read_expression_matrix(args.expfile)
 print  'Parsing input file'
-print  'Finished parsing input matrix'
+samples, genes, M = ett.io.read_expression_matrix(args.expfile, get_rid_of_NAs=True, merge_same_ids=True)
+print  'Finished parsing input matrix. Matrix has %s rows and %s columns (number of samples are %s).' % (M.shape[0], M.shape[1], len(samples)) 
 print  'Calculating correlation matrix'
 Mcorr = corrcoef(M)
 print  'Applying soft thresholding %s and hard thresholding %s' % (args.sthresh, args.hthresh)
@@ -55,17 +54,23 @@ if args.binarize:
 if args.clustermethod == 'hierarchical':
     print 'Doing hierarchical clustering'
     print  'Building link community matrix'
-    D = ntools.link_communities_matrix_by_TOM(Ms, edges)
+    D = ntools.link_communities_matrix_by_TOM(Ms, edges, squareform=True)
     del(Ms)
-    for i in range(D.shape[0]):
-	D[i,i] = 1
+    #for i in range(D.shape[0]):
+    #	D[i,i] = 1
 
     print 'Max similarity %s, mean %s, standard dev %s' % (D.max(), D.mean(), D.std())
-    Mls = squareform(1 - abs(D))
-    del(D)
+    logger.write_and_close('Max similarity %s, mean %s, standard dev %s' % (D.max(), D.mean(), D.std()))
+    #Mls = squareform(1 - abs(D))
+    Mls = D
+    logger.write_and_close('squared the matrix')
+    #del(D)
     Z = fastcluster.linkage(Mls, method='single')
+    logger.write_and_close('ran linkage')
+    #Z = sch.linkage(Mls, method='single')
     maxdistance = Mls.max()
     del(Mls)
+    logger.write_and_close('Done clustering, about to choose clusters')
 
     print  'Choosing cluster by maximum partition density'
     clusts = ntools.choose_clusters_by_partition_density(Z, 0, maxdistance, 0.01*maxdistance, criterion='distance',  edges=edges)
