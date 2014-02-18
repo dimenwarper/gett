@@ -1,12 +1,28 @@
-#graphical_lasso.py
-# base code grabbed from github: https://github.com/CamDavidsonPilon
-
-
 import numpy as np
+import rpy2.robjects as robjects
 from sklearn.linear_model import lars_path
 from sklearn import linear_model
 from generalized_lasso import generalized_lasso
+from ett.network_building.models import SparseGraph
 
+def joint_graphical_lasso(data_matrices, Lambda1, lambda2=0):
+    n, p = data_matrices[0].shape[0], data_matrices[0].shape[0]
+    
+    if type(Lambda1) != float:
+        rLambda1 = robjects.r.matrix(robjects.FloatVector(Lambda1.ravel()), nrow=n, byrow=True)
+    else:
+        rLambda1 = Lambda1
+    matrix_list = [(i+1, robjects.r.matrix(robjects.FloatVector(X.ravel()), nrow=n, byrow=True)) for i, X in data_matrices]
+    rmatrix_list = robjects.ListVector(dict(matrix_list))
+
+    robjects.r('library(JGL)')
+    glasso = robjects.r.glasso
+    JGL = robjects.r.JGL
+
+
+    gobj = JGL(rmatrix_list, lambda1=rLambda1, lambda2=lambda2, return_whole_theta=True)
+    Thetas = [reshape(array(list(gobj[0][i])), [n, n]) for i in xrange(len(matrices))]
+    return [SparseGraph(T) for T in Thetas]
 
 
 

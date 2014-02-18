@@ -1,5 +1,6 @@
 from numpy import * 
 from collections import defaultdict
+import pandas as pd
 import pdb
 
 def read_genotype_matrix(genmatfile, skip_fields=6, sep=' ', restrict_samples=[]):
@@ -14,37 +15,44 @@ def read_genotype_matrix(genmatfile, skip_fields=6, sep=' ', restrict_samples=[]
 	line = genmatfile.readline()
     return labels, array(genmat)
 
-def read_expression_matrix(expfile, sep='\t', get_rid_of_NAs=False, merge_same_ids=False):
-    header = expfile.readline().strip().split(sep)
+
+def read_expression_matrix(*args, **kwargs):
+    return read_trait_matrix(*args, **kwargs)
+
+def read_expression_matrix(tfile, sep='\t', get_rid_of_NAs=False, merge_same_ids=False, as_array=False):
+    header = tfile.readline().strip().split(sep)
     genenames = []
-    Mexp = []
-    line = expfile.readline()
+    M = []
+    line = tfile.readline()
     numfields = len(line.strip().split(sep))
     while line:
 	fields = line.strip().split(sep)
 	a = [float("nan") if f == 'NA' else float(f) for f in fields[1:]]
         if a:
-            Mexp.append(a)
+            M.append(a)
             genenames.append(fields[0])
-	line = expfile.readline()
-    Mexp = array(Mexp)
+	line = tfile.readline()
+    M = array(M)
     if get_rid_of_NAs:
-        good_cols = [i for i in range(Mexp.shape[1]) if sum(isnan(Mexp[:,i])) == 0 ] 
-	Mexp = Mexp[:, good_cols]
+        good_cols = [i for i in range(M.shape[1]) if sum(isnan(M[:,i])) == 0 ] 
+	M = M[:, good_cols]
     else:
-	Mexp = nan_to_num(Mexp)
+	M = nan_to_num(Mexp)
     if merge_same_ids:
         gindices = defaultdict(list)
         for i, g in enumerate(genenames):
             gindices[g].append(i)
         true_size = len(gindices)
-        new_Mexp = zeros([true_size, Mexp.shape[1]])
+        new_M = zeros([true_size, M.shape[1]])
         for i, g in enumerate(gindices):
-            new_Mexp[i,:] = median(Mexp[gindices[g],:], axis=0)
-        del(Mexp)
-        Mexp = new_Mexp
+            new_M[i,:] = median(M[gindices[g],:], axis=0)
+        del(M)
+        M = new_M
         genenames = gindices.keys()
-    return header, genenames, Mexp
+    if as_array:
+        return header, genenames, M
+    else:
+        return pd.DataFrame(M, index=genenames, columns=header)
 
 def read_community(communityfile, sep='\t'):
     nodesbycluster = {}
