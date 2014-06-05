@@ -282,7 +282,7 @@ def topological_change_trait(Mexp_cases, Mcorr_cases, Mcorr_controls, Mcorr_Madj
 		maxdeg = deg
 		gene = g
 	if gene < 0:
-	    log.write('Warning: A netwok with no edges was found')
+	    log.write('Warning: A network with no edges was found')
 	traits[id] = zeros([dims[1]])
 	case_neighbors = []
 	for edge in net:
