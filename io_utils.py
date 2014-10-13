@@ -77,6 +77,8 @@ def read_community(communityfile, sep='\t'):
 	    else:
 		nodesbycluster[cluster] = set([e[0], e[1]])
 		edgesbycluster[cluster] = [e]
+    for c, nodes in nodesbycluster.iteritems():
+        nodesbycluster[c] = list(nodes)
     return nodesbycluster, edgesbycluster
 
 # Use this instead
@@ -149,6 +151,31 @@ def write_dict(outfile, d, split_lists=False, sep='\t'):
 	else:
 	    outfile.write(str(k) + sep + str(v) + '\n')
 
+def read_edges(dfile, sep='\t', indices=None, symmetric=False):
+    edges = {}
+    index_cache = {}
+    for l in dfile.readlines():
+        if l[0] != '#':
+            fields = l.strip().split(sep)
+            if indices is not None:
+                if fields[0] not in index_cache:
+                    f1 = indices.index(fields[0])
+                    index_cache[fields[0]] = f1
+                else:
+                    f1 = index_cache[fields[0]]
+                if fields[1] not in index_cache:
+                    f2 = indices.index(fields[1])
+                    index_cache[fields[1]] = f2
+                else:
+                    f2 = index_cache[fields[1]]
+                edges[(f1, f2)] = float(fields[2])
+                if symmetric:
+                    edges[(f2, f1)] = float(fields[2])
+            else:
+                edges[(fields[0], fields[1])] = float(fields[2])
+                if symmetric:
+                    edges[(fields[1], fields[0])] = float(fields[2])
+    return edges
 def read_dict(dfile, numfieldsid=1, apply_for_keys=lambda x: x, apply_for_values=lambda x:x, sep='\t', header=True):
     d = {}
     if header:
@@ -226,6 +253,7 @@ def save_step(objs, names, suffix='', type='dataframe'):
     for obj, name in zip(objs, names):
         new_name = '%s%s.txt' % (name[:name.rfind('.')], suffix)
         if type == 'dataframe':
+            print 'Saving dataframe %s' % name
             obj.to_csv(open(new_name, 'w'), sep='\t')
             new_names.append(new_name)
     return new_names

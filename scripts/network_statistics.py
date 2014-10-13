@@ -2,12 +2,11 @@ import matplotlib
 matplotlib.use('Agg')
 import pdb
 import argparse
-import ett.io
+import ett.io_utils
 from ett.network_building import confidence
 from matplotlib.pylab import *
 from collections import defaultdict
 from mpl_toolkits.mplot3d import Axes3D
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument('expfile', metavar='EXPRESSION_FILE', type=argparse.FileType('r'))
@@ -18,6 +17,47 @@ parser.add_argument('--sizecutoff', type=int, default=5)
 parser.add_argument('outdir', metavar='OUT_DIR', type=str)
 
 args = parser.parse_args()
+
+def normalize_dict(d):
+    vals = d.values()
+    vals = array(vals)
+    mean = vals.mean()
+    std = vals.std()
+    dn = {}
+    """
+    for k in d:
+        dn[k] = log(d[k])/log(vals.max())
+    maxval = max(dn.values())
+    minval = min(dn.values())
+
+    #for k, v in dn.iteritems():
+    #    dn[k] = (v + 0.5)/maxval
+    """
+    sorted_vals = sorted(list(set(vals)))
+    ref = arange(0, 1, 1./len(sorted_vals))
+    for k in d:
+        idx = sorted_vals.index(d[k])
+        dn[k] = ref[idx]
+    return dn
+
+def get_roles(lcs, gcs):
+    lc_mean = array(lcs.values()).mean()
+    gc_mean = array(gcs.values()).mean()
+    lc_mean, gc_mean  = 0.5, 0.5
+    roles = {}
+    for n, lc in lcs.iteritems():
+        gc = gcs[n]
+        if lc > lc_mean:
+            if gc > gc_mean:
+                roles[n] = 'C-hub'
+            else:
+                roles[n] = 'L-hub'
+        else:
+            if gc > gc_mean:
+                roles[n] = 'S-hub'
+            else:
+                roles[n] = 'N-hub'
+    return roles
 
 s2efile = open('/home/tsuname/resources/hs_symbol2entrez.txt')
 symbol2entrez = {}
@@ -30,12 +70,12 @@ while line:
 
 
 print 'Parsing expression file'
-header, genenames, Mexp = ett.io.read_expression_matrix(args.expfile)
+header, genenames, Mexp = ett.io_utils.read_expression_matrix(args.expfile)
 geneids = [symbol2entrez[g] if g in symbol2entrez else 'NA' for g in genenames]
 print 'Parsing community file'
-nodesbycommunity, communities = ett.io.read_community(args.communityfile)
+nodesbycommunity, communities = ett.io_utils.read_community(args.communityfile)
 if args.directedcommunityfile:
-    dnodesbycommunity, dcommunities = ett.io.read_community(args.directedcommunityfile)
+    dnodesbycommunity, dcommunities = ett.io_utils.read_community(args.directedcommunityfile)
 
 if args.encodefile:
     print 'Parsing regression file'
@@ -53,6 +93,8 @@ commsizes = defaultdict(int)
 degrees = defaultdict(int)
 commdegrees = defaultdict(int)
 ntcommdegrees = defaultdict(int)
+gcs = defaultdict(int)
+lcs = defaultdict(int)
 # Maximum intra-modular degrees (mids)
 mids = defaultdict(int)
 curr_mids = defaultdict(int)
@@ -90,6 +132,21 @@ for c, nodes in nodesbycommunity.iteritems():
 	    ntcommdegrees[n] += 1
         numntcomm += 1
 
+for n, m in degrees.iteritems():
+    lcs[n] = m
+    if n not in gcs:
+        gcs[n] = 0.
+
+for n, cd in ntcommdegrees.iteritems():
+    gcs[n] = float(cd)
+    if n not in lcs:
+        lcs[n] = 0
+
+
+lcs = normalize_dict(lcs)
+gcs = normalize_dict(gcs)
+roles = get_roles(lcs, gcs)
+
 expmeans = defaultdict(int)
 for n in commdegrees:
     expmeans[n] = Mexp[n,:].mean()
@@ -112,18 +169,21 @@ if args.directedcommunityfile:
 
 print 'Printing out summary file'
 ofile = open(args.outdir + '/summary.txt', 'w')
-ofile.write('#Gene symbol\tEntrez id\tNormalized maximum intramodular degree\tNormalized total degree\tNormalized number of communities\tNormalized number of non-trivial communities (size >=%s)\tMean Expression\n' % args.sizecutoff)
-for n in commdegrees:
-    name = genenames[n]
-    id = geneids[n]
-    if n in ntcommdegrees: 
-	nntcomdeg = nntcomdegdict[n]
+ofile.write('#Gene symbol\tEntrez id\tLC\tGC\tRole\tNormalized maximum intramodular degree\tNormalized total degree\tNormalized number of communities\tNormalized number of non-trivial communities (size >=%s)\tMean Expression\n' % args.sizecutoff)
+for name in sorted(genenames):
+    n = genenames.index(name)
+    if n in commdegrees:
+        id = geneids[n]
+        if n in ntcommdegrees: 
+            nntcomdeg = nntcomdegdict[n]
+        else:
+            nntcomdeg = 0
+        ofile.write('%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' % (name, id, lcs[n], gcs[n], roles[n], mids[n]/maxmid, degrees[n]/maxdegree, commdegrees[n]/maxcommdegree, nntcomdeg, expmeans[n]))
     else:
-	nntcomdeg = 0
-    ofile.write('%s\t%s\t%s\t%s\t%s\t%s\t%s\n' % (name, id, mids[n]/maxmid, degrees[n]/maxdegree, commdegrees[n]/maxcommdegree, nntcomdeg, expmeans[n]))
+        ofile.write('%s\n' % (name))
 ofile.close()
     
-
+exit()
 figure(1)
 # Degree decay graphs
 clf()

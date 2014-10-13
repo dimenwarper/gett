@@ -24,9 +24,14 @@ def cov_shrink(data_matrix):
     res = np.reshape(np.array(list(res)), [p,p])
     return res
 
-def _filter_matrix(M, thresh):
+def _filter_matrix(M, thresh, normalize=False):
+    if normalize:
+        normf = abs(M[abs(M) != 1]).max()
+        print 'Normalizing value %s' % norm
+    else:
+        normf = 1
     if thresh is not None:
-        M[abs(M) < thresh] = 0
+        M[abs(M)/normf < thresh] = 0
     print (M != 0).sum()
     selected_indices = np.array([True if (M[i,:] != 0).sum() > 2 else False for i in xrange(M.shape[0])])
 
@@ -61,7 +66,7 @@ def invcov_shrink(data_matrix, thresh=None):
     selected_indices = np.array([True if (res[i,:] != 0).sum() > 2 else False for i in xrange(p)])
     return selected_indices, res
 
-def joint_graphical_lasso(data_matrices, Lambda1, lambda2=0, return_whole_theta=False, mindegree=0):
+def joint_graphical_lasso(data_matrices, Lambda1, lambda2=0, return_whole_theta=False, mindegree=0, return_aic=False):
     p, n = data_matrices[0].shape[0], data_matrices[0].shape[1]
     
     if type(Lambda1) == float:
@@ -69,11 +74,11 @@ def joint_graphical_lasso(data_matrices, Lambda1, lambda2=0, return_whole_theta=
     elif type(Lambda1) == np.ndarray:
         rLambda1 = robjects.r.matrix(robjects.FloatVector(Lambda1.ravel()), nrow=p, byrow=True)
     elif type(Lambda1) == list:
-        rLambda1 = robjects.vectors.ListVector(dict([(i, robjects.r.matrix(robjects.FloatVector(L.ravel()), nrow=p, byrow=True)) for i, L in enumerate(Lambda1)]))
+        rLambda1 = robjects.vectors.ListVector(dict([(str(i), robjects.r.matrix(robjects.FloatVector(L.ravel()), nrow=p, byrow=True)) for i, L in enumerate(Lambda1)]))
     else:
         print 'Type of penalty matrix not recognized'
 
-    matrix_list = [(i+1, _data_matrix_to_R(X)) for i, X in enumerate(data_matrices)]
+    matrix_list = [(str(i+1), _data_matrix_to_R(X)) for i, X in enumerate(data_matrices)]
     rmatrix_list = robjects.ListVector(dict(matrix_list))
 
     robjects.r('library(JGL)')
@@ -100,12 +105,20 @@ def joint_graphical_lasso(data_matrices, Lambda1, lambda2=0, return_whole_theta=
                     selected = True
             if selected:
                 selected_selected_indices.append(i)
-        Thetas_new = [T[selected_selected_indices,:][:,selected_selected_indices] for T in Thetas]
+        Thetas = [T[selected_selected_indices,:][:,selected_selected_indices] for T in Thetas]
         new_p = selected_indices.sum()
         print 'NEW_P after pruning %s ' % new_p
         print 'Number of variables after JGL %s' % new_p
     sgraphs =  [SparseGraph(T) for T in Thetas]
     print 'Number of non-trivial edges: %s and %s' % (len([(i,j) for i,j in sgraphs[0].edges if i != j])/2, len([(i,j) for i,j in sgraphs[1].edges if i != j])/2)
+    if return_aic:
+        aic = 0.
+        print 'Calculating AIC'
+        for i, D in enumerate(data_matrices):
+            print 'Data matrix %s' % i
+            S = cov(array(D)[selected_indices, :])
+            aic += D.shape[1]*trace(dot(S, Thetas[i])) - D.shape[1]*log(det(Thetas[i])) + 2*sgraphs[i].nnz
+        return aic, selected_indices, sgraphs
     return selected_indices, sgraphs
 
 
@@ -228,48 +241,83 @@ def CLAMSeed(edges, neighbors, k):
 
 class LaplacianCLAM():
 
-    def __init__(self, alpha=20., tol=0.001, maxiter=20, max_num_comm=1000, scale=1):
+    def __init__(self, alpha=20., tol=0.001, maxiter=20, max_num_comm=1000, lambda1=1, ncomm_crit='splitval', target_scale=1.):
         self.max_num_comm = max_num_comm
         self.alpha = alpha
         self.tol = tol
         self.maxiter = maxiter
-        self.scale = scale
+        self.lambda1 = lambda1
+        self.target_scale = target_scale
+        self.ncomm_crit = ncomm_crit
+
+    def _calculate_scale(self, S, ncomm):
+        #return max(10, sqrt(ncomm))
+        return self.target_scale/abs(np.array(S.values())).mean()
+        if ncomm < 100:
+            return max(1, ncomm/20)
+        else:
+            return 20
 
     def __call__(self, S, num_comm=None):
         if num_comm != None:
             num_comm_values = [num_comm]
         else:
             num_comm_values = self._get_num_comm_values_to_try(S)
+        num_comm_values = [70]
+
+        calc_lhood = (len(num_comm_values) > 1)
 
         curr_F = None
         curr_BIC = np.inf
-        #S_scaled = SparseGraph(S)
+        curr_llhood = -np.inf
+        if self.ncomm_crit == 'crossval':
+            train_neighbors, test_neighbors = S.sample_edges(0.2, return_neighbors=True)
+        elif self.ncomm_crit == 'splitval':
+            train_neighbors, test_neighbors = S.split_edges(int(len(S.edges)*0.8), return_neighbors=True)
+        else:
+            train_neighbors, test_neighbors = None, None
         for k in num_comm_values:
+            #TODO self.scale should not be saved, instead returned
+            self.scale = self._calculate_scale(S, k)
             print 'Testing for number of communities %s' % k
             print 'Seeding communities'
             F0 = CLAMSeed(S.edges, S.neighbors, k)
-            #print F0
-            #print F0[F0 != 0.5]
-            #pdb.set_trace()
+            #old_llhood = self._calculate_llhood(S, F0, edges=test_edges)
+            #print 'Starting likelihood is %s' % old_llhood
             print 'Starting gradient descent'
-            F, llhood = self._sgd(S, F0)
-            #print F
-            #print F.max()
-            #print F.min()
+            F, llhood = self._sgd(S, F0, train_neighbors=train_neighbors, test_neighbors=test_neighbors, calc_lhood=calc_lhood)
             print 'Number of communities %s' % k 
             print 'Likelihood %s' % llhood
             print 'BIC %s' % self._bic(llhood, S, F)
-            pdb.set_trace()
-            if self._bic(llhood, S, F) < curr_BIC:
-                curr_BIC = self._bic(llhood, S, F)
-                curr_F = F
-        return curr_F
+            #pdb.set_trace()
+            if self.ncomm_crit == 'bic':
+                if self._bic(llhood, S, F) < curr_BIC:
+                    curr_BIC = self._bic(llhood, S, F)
+                    curr_F = F
+            if self.ncomm_crit == 'crossval' or self.ncomm_crit == 'splitval':
+                if llhood > curr_llhood:
+                    curr_llhood = llhood
+                    curr_F = F
+        self.scale = self._calculate_scale(S, curr_F.shape[1])
+        return F
     
-    def get_membership_vectors(self, S, F):
-        epsilon = 2.*len(S.edges)/(S.shape[0]*(S.shape[0]-1))
-        delta = np.sqrt(-np.log(1-epsilon))
-        # Don't copy to be memory efficient
-        F_thresh = F
+    def _calculate_membership_params(self, S, ncomm):
+        # epsilon is the background probability of an edge
+        epsilon = min(0.9, 1./(S.shape[0]**2))
+        # delta will be the threshold to decide if F[i,j] is one or not
+        delta = sqrt(1./(2*(1 - epsilon)))
+        return epsilon, delta
+
+    def get_membership_vectors(self, S, F, copy=True):
+        epsilon, delta = self._calculate_membership_params(S, F.shape[1])
+        #print 'epsilon %s, delta %s' % (epsilon, delta)
+        #print 'F max %s' % (F.max())
+        #print 'F MYH7 \n%s' % (F[3956,:])
+        #print 'F somethin \n%s' % (F[1000,:])
+        if copy:
+            F_thresh = F.copy()
+        else:
+            F_thresh = F
         F_thresh[F_thresh < delta] = 0
         F_thresh[F_thresh != 0] = 1
         return F_thresh
@@ -282,28 +330,37 @@ class LaplacianCLAM():
                 overlap_matrix[j,i] = overlap_matrix[i,j]
         return overlap_matrix
 
-    def _calculate_llhood(self, S, F):
-        res = 0
-        sumF = F.sum(axis=0)
-        sumF_neighbors = 0
+    def _calculate_llhood(self, S, Fin, neighbors=None):
+        if neighbors is None:
+            neighbors = S.neighbors
+        res1 = 0
+        res2 = 0
+        F = self.get_membership_vectors(S, Fin)
+        print 'F:Max\tMin\tAverage Sum'
+        print '%s\t%s\t%s' % (F.max(), F.min(), F.sum(axis=1).mean())
+        print 'scale: %s' % self.scale 
+        for i in xrange(F.shape[0]):
+            sumF_neighbors = 0
+            for j in neighbors[i]:
+                sumF_neighbors += -self.lambda1*self.scale/(np.dot(F[i,:],F[j,:]) + 1)*np.abs(S[i,j])
+                sumF_neighbors += -np.log(np.dot(F[i,:], F[j,:]) + 1)
+            res1 += sumF_neighbors -(F.shape[0] - len(neighbors[i]))*np.log(F[i,:].sum() + 1)
+            #res1 += sumF_neighbors -(F.shape[0])*np.log(F[i,:].sum() + 1)
+
         for i in xrange(S.shape[0]):
             for j in xrange(i, S.shape[1]):
-                res += -1/(self.scale*np.dot(F[i,:],F[j,:]))*np.abs(S[i,j])
-                res += -np.log(np.dot(F[i,:],F[j,:]))
-        """
-        for i in xrange(F.shape[0]):
-            for j in S.neighbors[i]:
-                sumF_neighbors += -1/(self.scale*np.dot(F[i,:],F[j,:]))*np.abs(S[i,j])*0.5
-            res += -np.log(F[i,:].sum())
-        """
-        return res
+                res2 += -self.lambda1*self.scale/(np.dot(F[i,:],F[j,:]) + 1)*np.abs(S[i,j])
+                res2 += -np.log(np.dot(F[i,:],F[j,:]) + 1)
+        res2 *= 2
+        print 'True %s, approx. %s' % (res2, res1)
+        return res2
 
 
 
     def _bic(self, llhood, S, F):
         return -2*llhood + F.size*np.log(S.size)
 
-    def _sgd(self, S, F0):
+    def _sgd(self, S, F0, train_neighbors=None, test_neighbors=None, calc_lhood=True):
         alpha = self.alpha
         n = F0.shape[0]
         prevF = np.zeros(F0.shape)
@@ -312,42 +369,58 @@ class LaplacianCLAM():
         sampleindices = range(F0.shape[0])
         i = 0
         llhood = -np.inf
-        currdiff = ((currF - prevF)**2).mean()
+        currdiff = ((currF[currF > 0] - prevF[currF > 0])**2).mean()
+        #currdiff = abs(currF - prevF).max()
         while currdiff > self.tol and i < self.maxiter:
             sys.stdout.write('===\nIteration %s ---- Current diff: %s\n' % (i, currdiff))
             prevF = currF.copy()
-            shuffle(sampleindices)
+            #shuffle(sampleindices)
             for j, idx in enumerate(sampleindices):
                 sys.stdout.write('\r[%d of %d]' % (j, F0.shape[0]))
                 sys.stdout.flush()
-                st = self._sgdgrad(S, currF, idx, st)
+                st = self._sgdgrad(S, currF, idx, st, neighbors=train_neighbors)
                 if alpha*abs(st).max() > currF.mean():
                     alpha = currF.mean()/np.abs(st).max()
                     #print 'Reducing step size alpha to %s' % alpha
                 currF += alpha*st
-                currF[currF <= 0] = 1e-10
-                currF[currF > 1] = 1
+            currF[currF <= 0] = 1e-10
+            currF[currF > 1] = 1
             i += 1
             print ' '
-            currdiff = (abs(currF - prevF)).max()
-        llhood = self._calculate_llhood(S, currF)
+            currdiff = ((currF[currF > 0] - prevF[currF > 0])**2).mean()
+            #currdiff = abs(currF - prevF).max()
+        if calc_lhood:
+            if test_neighbors is not None:
+                llhood = self._calculate_llhood(S, currF, neighbors=test_neighbors)
+            else:
+                llhood = self._calculate_llhood(S, currF)
+        else:
+            llhood = 1
         return currF, llhood
 
                 
-    def _sgdgrad(self, S, F, i, res):
+    def _sgdgrad(self, S, F, i, res, neighbors=None):
+        if neighbors is None:
+            neighbors = S.neighbors
         """
         for j in xrange(n):
             res[k*i:k*i+k] = -0.5*F[j,:]/((dot(F[i,:], F[j,:]))**2)*abs(M[i,j]) + F[j,:]/dot(F[i,:], F[j,:])
         """
         sumF_neighbors = np.zeros([F.shape[1]])
-        if i in S.neighbors:
-            for j in S.neighbors[i]:
-                sumF_neighbors += self.scale*0.5*F[j,:]/((np.dot(F[i,:], F[j,:]) + 1)**2)*np.abs(S[i,j])
-            res[i,:] = sumF_neighbors - 1/(F[i,:].sum() + 1)
-        #print res[k*i:k*i+k] 
+        if i in neighbors:
+            sumF_neighbors[:] = 0
+            for j in neighbors[i]:
+                sumF_neighbors += self.lambda1*self.scale*F[j,:]/((np.dot(F[i,:], F[j,:]) + 1)**2)*np.abs(S[i,j])
+                sumF_neighbors += -F[j,:]/(np.dot(F[i,:], F[j,:]) + 1)
+            res[i,:] = sumF_neighbors - (F.shape[0] - len(neighbors[i]))/(F[i,:].sum() + 1)
+            #res[i,:] = sumF_neighbors - (F.shape[0])/(F[i,:].sum() + 1)
+            
+        """
+        for j in xrange(F.shape[0]):
+            res[i,:] += self.lambda1*self.scale*F[j,:]/((np.dot(F[i,:],F[j,:]) + 1)**2)*np.abs(S[i,j])
+            res[i,:] += -F[j,:]/(np.dot(F[i,:],F[j,:]) + 1)
+        """
         return res
-
-        return 1
     
     def _laplace_prob(self, x, k):
         return 1./(2.*k)*np.exp(-np.abs(x)/k)
@@ -364,8 +437,8 @@ class LaplacianCLAM():
 
     def _get_num_comm_values_to_try(self, S):
         print 'Getting number of communities'
-        limit = max(S.shape[0], 1000)
-        return np.arange(1, limit, limit/5 - 1)
+        limit = min(S.shape[0], 500)
+        return np.arange(10, limit, limit/7 - 1)
         num_comm_range = np.arange(10, self.max_num_comm, 10)
         Z_zero, Z_non_zero = self._get_normalizing_constants(S, num_comm_range)
         E_zero = 0.5*self._num_comm_prior()/Z_zero.sum()
@@ -407,17 +480,19 @@ class LaplacianCLAM():
 
 class CLIP():
 
-    def __init__(self, ncomm=None, maxiter=20, commalpha=10., commtol=0.001, commiter=50, lambda1=0.7, lambda2=0.005, mindegree=0):
+    def __init__(self, ncomm=None, maxiter=10, commalpha=10., commtol=0.001, commiter=50, lambda1=0.7, lambda2=0.005, mindegree=0, initthresh=0.5):
         self.maxiter = maxiter
         self.lambda1 = lambda1
         self.lambda2 = lambda2
+        self.initthresh = initthresh
         self.ncomm = ncomm
         self.mindegree = mindegree
-        self.community_detector = LaplacianCLAM(alpha=commalpha, tol=commtol, maxiter=commiter, scale=self.lambda1)
+        self.community_detector = LaplacianCLAM(alpha=commalpha, tol=commtol, maxiter=commiter, lambda1=self.lambda1)
 
     def __call__(self, Dtraits):
         currDtraits = Dtraits
         selected_indices, prec_matrices = self._initialize_prec_matrices(Dtraits)
+        prev_prec_matrices = prec_matrices
         currDtraits = [D.ix[selected_indices,:] for D in currDtraits]
         for g in ['NPPA', 'NPPB', 'MYH7', 'MYBPC3', 'ATP2A2', 'PPP1R3A']:
             if g not in currDtraits[0].index:
@@ -430,24 +505,32 @@ class CLIP():
         cov_matrices = [np.cov(X) for X in Dtraits]
         comm_vectors = [0]*len(currDtraits)
         overlap_matrices = [0]*len(currDtraits)
+        penalty_matrices = [0]*len(currDtraits)
         llhood = -np.inf
         num_var = [selected_indices.sum()]
+        num_comms = [None for i in xrange(len(Dtraits))]
         for niter in xrange(self.maxiter):
             # Calculate overlap matrices and community vectors for each trait matrix given precision matrix
             for i, Sinv in enumerate(prec_matrices):
-                comm_vectors[i] = self.community_detector(Sinv)
+                comm_vectors[i] = self.community_detector(Sinv, num_comm=num_comms[i])
                 comm_vectors[i] = self.community_detector.get_membership_vectors(Sinv, comm_vectors[i])
-                overlap_matrices[i] = self.lambda1/self.community_detector.get_overlap_matrix(Sinv, comm_vectors[i])
-                #overlap_matrices[i][overlap_matrices[i] > 0.95] = 0.95
-                overlap_matrices[i][overlap_matrices[i] == np.inf] = 1000
+                overlap_matrices[i] = self.community_detector.get_overlap_matrix(Sinv, comm_vectors[i])
+                penalty_matrices[i] = self.community_detector.scale*self.lambda1/overlap_matrices[i]
+                #if overlap_matrices[i].max() > 1:
+                #    overlap_matrices[i] = overlap_matrices[i]/overlap_matrices[i].max()
                 print 'Number of communities for %s: %s' % (i, comm_vectors[i].shape[1])
+            num_comms = [v.shape[1] for v in comm_vectors]
+            print 'Number of communities %s' % num_comms
+            #if niter == 0:
+                #print 'Overlaps for MYH7'
+                #print overlap_matrices[0][3956,:]
+                #print overlap_matrices[1][3956,:]
                 #pdb.set_trace()
-            print 'Number of communities %s' % [v.shape[1] for v in comm_vectors]
-            #pdb.set_trace()
 
             
             # Calculate precision matrices for each trait matrix given overlap matrices
-            selected_indices, prec_matrices = joint_graphical_lasso(currDtraits, overlap_matrices, lambda2=self.lambda2, return_whole_theta=True)
+            prev_prec_matrices = prec_matrices
+            selected_indices, prec_matrices = joint_graphical_lasso(currDtraits, penalty_matrices, lambda2=self.lambda2, return_whole_theta=True)
             num_var.append(selected_indices.sum())
             currDtraits = [D.ix[selected_indices,:] for D in currDtraits]
             llhood = self._calculate_llhood(prec_matrices, cov_matrices, comm_vectors, self.lambda2)
@@ -457,10 +540,20 @@ class CLIP():
             print 'At iteration %s' % niter
             print 'Number of non-trivial edges: %s' % ','.join([str(x) for x in nnt_edges_new])
             print 'Number of variables %s' % selected_indices.sum()
-            pdb.set_trace()
             finished = True
-            for ne_new, ne_prev in zip(nnt_edges_new, nnt_edges_prev):
-                if ne_new !=  ne_prev:
+            #for ne_new, ne_prev in zip(nnt_edges_new, nnt_edges_prev):
+            #    if ne_new != ne_prev:
+            #        finished = False
+            print 'Diff'
+            for i in xrange(len(prec_matrices)):
+                tot_nnz = float(prev_prec_matrices[i].nnz)
+                for n1, n2 in prec_matrices[i].edges:
+                    if (n1,n2) not in prev_prec_matrices[i].edges:
+                        tot_nnz += 1
+                diff = (abs(prev_prec_matrices[i] - prec_matrices[i])**2).sum()/tot_nnz
+                pec = (abs(nnt_edges_prev[i] - nnt_edges_new[i])/tot_nnz)
+                print '%s: diff %s, %% edges changed %s' % (i, diff, pec)
+                if diff > 0.001 and pec > 0.01:
                     finished = False
             nnt_edges_prev = nnt_edges_new
 
@@ -484,8 +577,8 @@ class CLIP():
         pinit = []
         init_indices = np.array([False]*p)
         for i in xrange(len(Dtraits)):
-            #selected_indices, invcov = pcor_shrink(Dtraits[i], thresh=0.02, cor=True)
-            selected_indices, invcov = corr(Dtraits[i], thresh=0.5)
+            #selected_indices, invcov = invcov_shrink(Dtraits[i])
+            selected_indices, invcov = corr(Dtraits[i], thresh=self.initthresh)
             pinit.append(invcov)
             init_indices = np.logical_or(init_indices, selected_indices)
         print 'Initializing with %s elements' % init_indices.sum()
@@ -514,7 +607,7 @@ class Shrinkage(object):
             indices = np.logical_or(indices, selected_indices)
         print 'Number of connected traits: %s' % indices.sum()
         for i in xrange(len(Dtraits)):
-            res[i] = SparseGraph(res[i][indices,:][:,indices])
-        return res
+            res[i] = res[i][indices,:][:,indices]
+        return res, [i for i, idx in enumerate(indices) if idx]
 
 
