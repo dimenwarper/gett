@@ -1,0 +1,2 @@
+#! /bin/bash
+python $GETT_HOME/scripts/gett.py "$@"
