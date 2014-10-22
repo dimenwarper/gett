@@ -1,5 +1,5 @@
 import sys
-import ett.io
+import gett.io
 import argparse
 import numpy.linalg
 import numpy.random
@@ -14,9 +14,9 @@ parser.add_argument('--sizecutoff', default=5, type=int)
 
 args = parser.parse_args()
 print 'Parsing expression file'
-header, genenames, Mexp = ett.io.read_expression_matrix(args.expfile)
+header, genenames, Mexp = gett.io.read_expression_matrix(args.expfile)
 print 'Parsing community file'
-nodesbycommunity, communities = ett.io.read_community(args.communityfile)
+nodesbycommunity, communities = gett.io.read_community(args.communityfile)
 
 sizes = [len(nodes) for nodes in nodesbycommunity.values() if len(nodes) >= args.sizecutoff]
 

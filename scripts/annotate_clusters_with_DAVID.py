@@ -1,8 +1,8 @@
 import argparse
 import pdb
-import ett.io
+import gett.io
 from suds import WebFault
-from ett.annotation import DAVIDannotate
+from gett.annotation import DAVIDannotate
 
 parser = argparse.ArgumentParser()
 
@@ -21,8 +21,8 @@ while line:
     if len(f) > 1:
 	symbol2entrez[f[0]] = f[1]
     line = s2efile.readline()
-samples, genenames, Mexop = ett.io.read_expression_matrix(args.geneexpressionfile)
-nodesbycluster, edgesbycluster = ett.io.read_community(args.communityfile)
+samples, genenames, Mexop = gett.io.read_expression_matrix(args.geneexpressionfile)
+nodesbycluster, edgesbycluster = gett.io.read_community(args.communityfile)
 
 writehead = True
 args.outfile.write('#First column is cluster id, the rest are tuples per term of the form:')

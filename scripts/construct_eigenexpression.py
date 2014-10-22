@@ -4,7 +4,7 @@ import scipy.cluster.hierarchy as sch
 from scipy.spatial.distance import squareform
 import fastcluster
 from optparse import OptionParser
-from ett.network_building import tools as ntools
+from gett.network_building import tools as ntools
 from numpy import *
 
 

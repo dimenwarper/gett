@@ -1,9 +1,9 @@
 import argparse
 import pdb
-import ett.io
-from ett.network_building import tools
+import gett.io
+from gett.network_building import tools
 import scipy.stats
-import ett.network_building.significance
+import gett.network_building.significance
 from itertools import chain
 
 parser = argparse.ArgumentParser()
@@ -45,11 +45,11 @@ def get_number_of_clusters_by_node(nodesbycluster):
     return clustersizebynode
 
 print 'Parsing expression files'
-caseheader, casegenenames, caseMexp = ett.io.read_expression_matrix(args.caseexpfile)
-controlheader, controlgenenames, controlMexp = ett.io.read_expression_matrix(args.controlexpfile)
+caseheader, casegenenames, caseMexp = gett.io.read_expression_matrix(args.caseexpfile)
+controlheader, controlgenenames, controlMexp = gett.io.read_expression_matrix(args.controlexpfile)
 print 'Parsing community files'
-casenodesbycluster, caseedgesbycluster = ett.io.read_community(args.casecommunityfile)
-controlnodesbycluster, controledgesbycluster = ett.io.read_community(args.controlcommunityfile)
+casenodesbycluster, caseedgesbycluster = gett.io.read_community(args.casecommunityfile)
+controlnodesbycluster, controledgesbycluster = gett.io.read_community(args.controlcommunityfile)
 
 allcontroledges = set([x for x in chain(*controledgesbycluster.values())])
 allcaseedges = set([x for x in chain(*caseedgesbycluster.values())])
@@ -92,9 +92,9 @@ def get_genetic_controller_coeffs(clust_list):
 		snps[snpid][2] += abs(coeff)
     return snps
 print 'Calculating SAM d statistics'
-samd = ett.network_building.significance.SAM_d(controlMexp, caseMexp)
+samd = gett.network_building.significance.SAM_d(controlMexp, caseMexp)
 print 'Obtaining significant clusters by preservation metric'
-sig_by_pres = ett.network_building.significance.significance_by_randomiziation(allnodes, allcaseedges, casenodesbycluster, caseedgesbycluster, preservation_metric_wrapper, size_cutoff=10)
+sig_by_pres = gett.network_building.significance.significance_by_randomiziation(allnodes, allcaseedges, casenodesbycluster, caseedgesbycluster, preservation_metric_wrapper, size_cutoff=10)
 print 'Obtaining genetic controllers of these clusters'
 controllers_pres = get_genetic_controller_coeffs([item[0] for item in sig_by_pres])
 print 'Ordering these clusters by SAM d statistic'
@@ -102,7 +102,7 @@ for item in sig_by_pres:
     item.append(samd[list(casenodesbycluster[item[0]])].mean())
 sorted_sig_by_pres = sorted(sig_by_pres, key=lambda item: abs(item[2]), reverse=True)
 print 'Obtaining significant clusters by inverse preservation metric'
-sig_by_invpres = ett.network_building.significance.significance_by_randomiziation(allnodes, allcaseedges, casenodesbycluster, caseedgesbycluster, preservation_metric_wrapper, compare=lambda randmeas , meas: randmeas < meas, size_cutoff=10)
+sig_by_invpres = gett.network_building.significance.significance_by_randomiziation(allnodes, allcaseedges, casenodesbycluster, caseedgesbycluster, preservation_metric_wrapper, compare=lambda randmeas , meas: randmeas < meas, size_cutoff=10)
 print 'Obtaining genetic controllers of these clusters'
 controllers_invpres = get_genetic_controller_coeffs([item[0] for item in sig_by_invpres])
 print 'Ordering these clusters by SAM d statistic'
@@ -112,17 +112,17 @@ sorted_sig_by_invpres = sorted(sig_by_invpres, key=lambda item: abs(item[2]), re
 
 
 print 'Reading OMIM'
-all_omim_genes = ett.network_building.significance.all_OMIM_genes()
+all_omim_genes = gett.network_building.significance.all_OMIM_genes()
 print 'Tagging case genes by OMIM'
-omim_genes = ett.network_building.significance.tag_by_genenames(range(len(casegenenames)), casegenenames, all_omim_genes)
+omim_genes = gett.network_building.significance.tag_by_genenames(range(len(casegenenames)), casegenenames, all_omim_genes)
 print 'Tagging case genes by differential expression'
-diff_genes = ett.network_building.significance.tag_by_differential_expression(caseMexp, controlMexp)
+diff_genes = gett.network_building.significance.tag_by_differential_expression(caseMexp, controlMexp)
 print 'Obtaining significant clusters by OMIM'
-sig_by_omim = ett.network_building.significance.significance_by_enrichment(casenodesbycluster, range(len(casegenenames)), omim_genes, size_cutoff=5)
+sig_by_omim = gett.network_building.significance.significance_by_enrichment(casenodesbycluster, range(len(casegenenames)), omim_genes, size_cutoff=5)
 print 'Obtaining genetic controllers of these clusters'
 controllers_omim = get_genetic_controller_coeffs([x[0] for x in sig_by_omim])
 print 'Obtaining significant clusters by differential expression'
-sig_by_diff = ett.network_building.significance.significance_by_enrichment(casenodesbycluster, range(len(casegenenames)), diff_genes, size_cutoff=5)
+sig_by_diff = gett.network_building.significance.significance_by_enrichment(casenodesbycluster, range(len(casegenenames)), diff_genes, size_cutoff=5)
 print 'Obtaining genetic controllers of these clusters'
 controllers_diff = get_genetic_controller_coeffs([x[0] for x in sig_by_diff])
 
@@ -159,16 +159,16 @@ print 'Obtaining genetic controllers for these clusters'
 controllers_topology = get_genetic_controller_coeffs(topology_clusts)
 
 print 'Writing to outfiles'
-ett.io.write_list(open(args.outfileprefix + '_by_OMIM.txt', 'w'), sig_by_omim)
-ett.io.write_list(open(args.outfileprefix + '_by_OMIM_controllers.txt', 'w'), controllers_omim.values())
-ett.io.write_list(open(args.outfileprefix + '_by_differential.txt', 'w') , sig_by_diff)
-ett.io.write_list(open(args.outfileprefix + '_by_preservation.txt', 'w') , sorted_sig_by_pres)
-ett.io.write_list(open(args.outfileprefix + '_by_inverse_preservation.txt', 'w') , sorted_sig_by_invpres)
-ett.io.write_list(open(args.outfileprefix + '_by_differential_controllers.txt', 'w'), controllers_diff.values())
+gett.io.write_list(open(args.outfileprefix + '_by_OMIM.txt', 'w'), sig_by_omim)
+gett.io.write_list(open(args.outfileprefix + '_by_OMIM_controllers.txt', 'w'), controllers_omim.values())
+gett.io.write_list(open(args.outfileprefix + '_by_differential.txt', 'w') , sig_by_diff)
+gett.io.write_list(open(args.outfileprefix + '_by_preservation.txt', 'w') , sorted_sig_by_pres)
+gett.io.write_list(open(args.outfileprefix + '_by_inverse_preservation.txt', 'w') , sorted_sig_by_invpres)
+gett.io.write_list(open(args.outfileprefix + '_by_differential_controllers.txt', 'w'), controllers_diff.values())
 topfile = open(args.outfileprefix + '_by_topology.txt', 'w')
 topfile.write('#Gene\tMembership clusters in cases\tIs hub in cases\tMembership clusters in controls\tIs hub in controls\n')
-ett.io.write_list(topfile, sorted_topology_list)
-ett.io.write_list(open(args.outfileprefix + '_by_topology_controllers.txt', 'w'), controllers_topology.values())
-ett.io.write_list(open(args.outfileprefix + '_by_preservation_controllers.txt', 'w') , controllers_pres.values())
-ett.io.write_list(open(args.outfileprefix + '_by_inverse_preservation_controllers.txt', 'w') , controllers_invpres.values())
+gett.io.write_list(topfile, sorted_topology_list)
+gett.io.write_list(open(args.outfileprefix + '_by_topology_controllers.txt', 'w'), controllers_topology.values())
+gett.io.write_list(open(args.outfileprefix + '_by_preservation_controllers.txt', 'w') , controllers_pres.values())
+gett.io.write_list(open(args.outfileprefix + '_by_inverse_preservation_controllers.txt', 'w') , controllers_invpres.values())
 

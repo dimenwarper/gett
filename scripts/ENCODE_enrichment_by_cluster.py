@@ -1,7 +1,7 @@
-import ett.io
+import gett.io
 import argparse
-import ett.io
-from ett.annotation import ENCODEannotate
+import gett.io
+from gett.annotation import ENCODEannotate
 from scipy.stats import fisher_exact 
 
 parser = argparse.ArgumentParser()
@@ -15,8 +15,8 @@ parser.add_argument('outfile', type=argparse.FileType('w'))
 args = parser.parse_args()
 
 print 'Reading input files'
-snp2coordinates = ett.io.snp2coordinate(args.snpcoordinatefile)
-coeffs, coeff_labels, coeff_snpids, coeff_in_coords = ett.io.parse_coeff_file(args.regressionfile, snp2coordinates)
+snp2coordinates = gett.io.snp2coordinate(args.snpcoordinatefile)
+coeffs, coeff_labels, coeff_snpids, coeff_in_coords = gett.io.parse_coeff_file(args.regressionfile, snp2coordinates)
 
 def get_snp_counts(snplist):
     annotated_bgsnps = ENCODEannotate(snplist)
@@ -29,7 +29,7 @@ def get_snp_counts(snplist):
 
 print 'Getting regulomeDB category counts for background SNPs'
 if args.bgsnpfile:
-    bgsnps = ett.io.read_coord_file(args.bgsnpfile)
+    bgsnps = gett.io.read_coord_file(args.bgsnpfile)
     cat_bgsnps = get_snp_counts(bgsnps)
     tot_bgsnps = len(bgsnps)
 else:

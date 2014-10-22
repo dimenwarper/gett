@@ -1,7 +1,7 @@
 import argparse
-import ett.io
+import gett.io
 import pdb
-from ett.network_building import clustering
+from gett.network_building import clustering
 from scipy.sparse import lil_matrix
 from matplotlib.pylab import *
 from collections import defaultdict
@@ -18,9 +18,9 @@ parser.add_argument('outfile', metavar='OUT_FILE', type=argparse.FileType('w'))
 args = parser.parse_args()
 
 print 'Parsing expression file'
-header, genenames, Mexp = ett.io.read_expression_matrix(args.expfile)
+header, genenames, Mexp = gett.io.read_expression_matrix(args.expfile)
 print 'Parsing community file'
-nodesbycommunity, communities = ett.io.read_community(args.communityfile)
+nodesbycommunity, communities = gett.io.read_community(args.communityfile)
 print 'Parsing parameter file'
 E, Y = args.parameterfile.readline().strip().split('\t')
 alpha = float(args.parameterfile.readline().strip())

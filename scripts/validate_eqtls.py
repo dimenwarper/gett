@@ -1,7 +1,7 @@
 import sys
 import pdb
 from ett import utils
-from ett.network_building import validation
+from gett.network_building import validation
 from optparse import OptionParser
 from numpy import *
 

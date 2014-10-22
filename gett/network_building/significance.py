@@ -2,8 +2,8 @@ from matplotlib.pylab import *
 import scipy.stats
 import random
 import operator
-from ett.settings import *
-from ett.aux.fisher import fisher_exact
+from gett.settings import *
+from gett.aux.fisher import fisher_exact
 import pdb
 def significance_by_enrichment(nodesbycluster, allnodes, taggednodes, cutoff=0.05, apply_bonferroni=False, size_cutoff=1):
     sigvals = {}

@@ -2,13 +2,13 @@ import matplotlib
 matplotlib.use('Agg')
 import argparse
 import pdb
-import ett.io
-from ett.network_building import tools
+import gett.io
+from gett.network_building import tools
 import scipy.stats
-import ett.network_building.significance
+import gett.network_building.significance
 from itertools import chain
 from matplotlib.pylab import *
-from ett.plotting import manhattan
+from gett.plotting import manhattan
 
 parser = argparse.ArgumentParser()
 parser.add_argument('caseexpfile', metavar='CASE_EXPRESSION_FILE', type=argparse.FileType('r'))
@@ -51,11 +51,11 @@ def get_number_of_clusters_by_node(nodesbycluster):
     return clustersizebynode
 
 print 'Parsing expression files'
-caseheader, casegenenames, caseMexp = ett.io.read_expression_matrix(args.caseexpfile)
-controlheader, controlgenenames, controlMexp = ett.io.read_expression_matrix(args.controlexpfile)
+caseheader, casegenenames, caseMexp = gett.io.read_expression_matrix(args.caseexpfile)
+controlheader, controlgenenames, controlMexp = gett.io.read_expression_matrix(args.controlexpfile)
 print 'Parsing community files'
-casenodesbycluster, caseedgesbycluster = ett.io.read_community(args.casecommunityfile)
-controlnodesbycluster, controledgesbycluster = ett.io.read_community(args.controlcommunityfile)
+casenodesbycluster, caseedgesbycluster = gett.io.read_community(args.casecommunityfile)
+controlnodesbycluster, controledgesbycluster = gett.io.read_community(args.controlcommunityfile)
 
 allcontroledges = set([x for x in chain(*controledgesbycluster.values())])
 allcaseedges = set([x for x in chain(*caseedgesbycluster.values())])
@@ -126,11 +126,11 @@ control_controllers_topology = get_genetic_controller_coeffs(control_topology_cl
 print 'Writing to outfiles'
 topfile = open(args.outfileprefix + 'cases__by_topology.txt', 'w')
 topfile.write('#Gene\tMembership clusters in cases\tMembership clusters in controls\n')
-ett.io.write_list(topfile, case_sorted_topology_list)
+gett.io.write_list(topfile, case_sorted_topology_list)
 
 topfile = open(args.outfileprefix + 'control__by_topology.txt', 'w')
 topfile.write('#Gene\tMembership clusters in cases\tMembership clusters in controls\n')
-ett.io.write_list(topfile, control_sorted_topology_list)
+gett.io.write_list(topfile, control_sorted_topology_list)
 
 print 'Plotting manhattan plot of controllers'
 

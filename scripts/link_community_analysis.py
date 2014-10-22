@@ -6,9 +6,9 @@ import os.path
 import sys
 import pdb
 import argparse
-import ett.network_building.tools as ntools
-import ett.io
-from ett.network_building import log as logger
+import gett.network_building.tools as ntools
+import gett.io
+from gett.network_building import log as logger
 
 from scipy.spatial.distance import squareform
 from matplotlib.pylab import *
@@ -26,7 +26,7 @@ parser.add_argument('--outname', type=str, default='', help='Name to pre-append 
 
 args = parser.parse_args()
 print  'Parsing input file'
-samples, genes, M = ett.io.read_expression_matrix(args.expfile, get_rid_of_NAs=True, merge_same_ids=True)
+samples, genes, M = gett.io.read_expression_matrix(args.expfile, get_rid_of_NAs=True, merge_same_ids=True)
 print  'Finished parsing input matrix. Matrix has %s rows and %s columns (number of samples are %s).' % (M.shape[0], M.shape[1], len(samples)) 
 print  'Calculating correlation matrix'
 Mcorr = corrcoef(M)

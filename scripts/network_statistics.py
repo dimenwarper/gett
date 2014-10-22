@@ -2,8 +2,8 @@ import matplotlib
 matplotlib.use('Agg')
 import pdb
 import argparse
-import ett.io_utils
-from ett.network_building import confidence
+import gett.io_utils
+from gett.network_building import confidence
 from matplotlib.pylab import *
 from collections import defaultdict
 from mpl_toolkits.mplot3d import Axes3D
@@ -70,12 +70,12 @@ while line:
 
 
 print 'Parsing expression file'
-header, genenames, Mexp = ett.io_utils.read_expression_matrix(args.expfile)
+header, genenames, Mexp = gett.io_utils.read_expression_matrix(args.expfile)
 geneids = [symbol2entrez[g] if g in symbol2entrez else 'NA' for g in genenames]
 print 'Parsing community file'
-nodesbycommunity, communities = ett.io_utils.read_community(args.communityfile)
+nodesbycommunity, communities = gett.io_utils.read_community(args.communityfile)
 if args.directedcommunityfile:
-    dnodesbycommunity, dcommunities = ett.io_utils.read_community(args.directedcommunityfile)
+    dnodesbycommunity, dcommunities = gett.io_utils.read_community(args.directedcommunityfile)
 
 if args.encodefile:
     print 'Parsing regression file'

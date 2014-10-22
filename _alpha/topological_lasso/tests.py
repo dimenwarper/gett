@@ -1,7 +1,7 @@
 from generalized_lasso import generalized_lasso
 from graphical_lasso import centralized_graphical_lasso
 from matplotlib.pylab  import *
-import ett.io
+import gett.io
 
 print 'Testing generalized_lasso'
 A = randn(4,40)
@@ -17,7 +17,7 @@ print 'Random number, evaluated in lasso function: %s' % lasso_fun(randn(len(res
 
 print 'Testing centralized_graphical_lasso'
 # Read the heart failure eqtl dataset!
-#samples, genenames, Mexp = ett.io.read_expression_matrix(open('../hf_eqtl/full_exp_varcutoff_50.txt'))
+#samples, genenames, Mexp = gett.io.read_expression_matrix(open('../hf_eqtl/full_exp_varcutoff_50.txt'))
 print 'Finished reading'
 Mexp = randn(400,20000)
 D = eye(Mexp.shape[0])

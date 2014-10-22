@@ -6,9 +6,9 @@ import os.path
 import sys
 import pdb
 import argparse
-import ett.network_building.tools as ntools
-import ett.io
-from ett.network_building import log as logger
+import gett.network_building.tools as ntools
+import gett.io
+from gett.network_building import log as logger
 from operator import itemgetter
 
 from scipy.spatial.distance import squareform
@@ -21,7 +21,7 @@ parser.add_argument('--nbins', type=int, default=50, help='Number of bins to dis
 
 args = parser.parse_args()
 print  'Parsing gene expression file'
-samples, genenames, M = ett.io.read_expression_matrix(args.expfile, get_rid_of_NAs=True, merge_same_ids=True)
+samples, genenames, M = gett.io.read_expression_matrix(args.expfile, get_rid_of_NAs=True, merge_same_ids=True)
 print  'Finished parsing input matrix. Matrix has %s rows and %s columns (number of samples are %s).' % (M.shape[0], M.shape[1], len(samples)) 
 print  'Calculating correlation matrix'
 Mcorr = corrcoef(M)

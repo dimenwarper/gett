@@ -1,5 +1,5 @@
 import sys
-import ett.io
+import gett.io
 import argparse
 import random
 from scipy import stats
@@ -16,9 +16,9 @@ parser.add_argument('out_file',  type=argparse.FileType('w'))
 args = parser.parse_args()
 
 print 'Reading files'
-snp2coordinates = ett.io.snp2coordinate(args.snp_coordinate_file)
-coeffs, coeff_labels, coeff_snpids, coeff_in_coords = ett.io.parse_coeff_file(args.coefficient_file, snp2coordinates)
-background_coeffs, background_coeff_labels, background_coeff_snpids, background_coeff_in_coords = ett.io.parse_coeff_file(args.background_file, snp2coordinates)
+snp2coordinates = gett.io.snp2coordinate(args.snp_coordinate_file)
+coeffs, coeff_labels, coeff_snpids, coeff_in_coords = gett.io.parse_coeff_file(args.coefficient_file, snp2coordinates)
+background_coeffs, background_coeff_labels, background_coeff_snpids, background_coeff_in_coords = gett.io.parse_coeff_file(args.background_file, snp2coordinates)
 
 print 'Building distributions'
 all_background_coeffs = abs(array([x for x in chain(*background_coeffs.values())]))

@@ -3,7 +3,7 @@ import rpy2.robjects as robjects
 from sklearn.linear_model import lars_path
 from sklearn import linear_model
 from generalized_lasso import generalized_lasso
-from ett.network_building.models import SparseGraph
+from gett.network_building.models import SparseGraph
 
 def joint_graphical_lasso(data_matrices, Lambda1, lambda2=0):
     n, p = data_matrices[0].shape[0], data_matrices[0].shape[0]

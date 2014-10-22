@@ -1,5 +1,5 @@
 import argparse
-import ett.io
+import gett.io
 import pdb
 
 parser = argparse.ArgumentParser()
@@ -11,9 +11,9 @@ parser.add_argument('size_cutoff', metavar='CUTOFF', default=5, type=int)
 args = parser.parse_args()
 
 print 'Parsing expression file'
-header, genenames, Mexp = ett.io.read_expression_matrix(args.expfile)
+header, genenames, Mexp = gett.io.read_expression_matrix(args.expfile)
 print 'Parsing community file'
-nodesbycommunity, communities = ett.io.read_community(args.communityfile)
+nodesbycommunity, communities = gett.io.read_community(args.communityfile)
 
 for c in nodesbycommunity:
     nodes = nodesbycommunity[c]

@@ -4,7 +4,7 @@ and the bigclam program from the SNAP package
 """
 from matplotlib.pylab import *
 import rpy2.robjects as robjects
-import ett.io
+import gett.io
 import os
 import argparse
 import pickle
@@ -21,7 +21,7 @@ parser.add_argument('--method', metavar='METHOD', type=str, default='jgl')
 args = parser.parse_args()
 
 print 'Parsing expression file'
-header, genenames, Mexp = ett.io.read_expression_matrix(args.expfile)
+header, genenames, Mexp = gett.io.read_expression_matrix(args.expfile)
 
 if args.edgefile != None:
     print 'Parsing edge file'

@@ -1,6 +1,6 @@
 import pdb
 import argparse
-import ett.io
+import gett.io
 from collections import defaultdict
 
 parser = argparse.ArgumentParser()
@@ -17,11 +17,11 @@ parser.add_argument('outfile', type=argparse.FileType('w'))
 
 args = parser.parse_args()
 print 'Parsing expression files'
-samples_sp1, genenames_sp1, Mexp_sp1 = ett.io.read_expression_matrix(args.expfile_sp1)
-samples_sp2, genenames_sp2, Mexp_sp2 = ett.io.read_expression_matrix(args.expfile_sp2)
+samples_sp1, genenames_sp1, Mexp_sp1 = gett.io.read_expression_matrix(args.expfile_sp1)
+samples_sp2, genenames_sp2, Mexp_sp2 = gett.io.read_expression_matrix(args.expfile_sp2)
 print 'Parsing community files'
-nodesbycluster_sp1, edgesbycluster_sp1 = ett.io.read_community(args.commfile_sp1)
-nodesbycluster_sp2, edgesbycluster_sp2 = ett.io.read_community(args.commfile_sp2)
+nodesbycluster_sp1, edgesbycluster_sp1 = gett.io.read_community(args.commfile_sp1)
+nodesbycluster_sp2, edgesbycluster_sp2 = gett.io.read_community(args.commfile_sp2)
 
 print 'Species 1 has %s communities' % len(nodesbycluster_sp1)
 print 'Species 2 has %s communities' % len(nodesbycluster_sp2)

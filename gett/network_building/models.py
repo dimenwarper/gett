@@ -6,8 +6,8 @@ import scipy.sparse
 from collections import defaultdict
 from sklearn.linear_model import lars_path
 from sklearn import linear_model
-from ett.linear.lasso import generalized_lasso
-from ett.network_building.data_structures import SparseGraph
+from gett.linear.lasso import generalized_lasso
+from gett.network_building.data_structures import SparseGraph
 from random import shuffle
 from matplotlib.pylab import *
 

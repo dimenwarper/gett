@@ -2,13 +2,13 @@ import matplotlib
 #matplotlib.use('Agg')
 import argparse
 import pdb
-import ett.io
-from ett.network_building import tools
+import gett.io
+from gett.network_building import tools
 import scipy.stats
-import ett.network_building.significance
+import gett.network_building.significance
 from itertools import chain
 from matplotlib.pylab import *
-from ett.plotting import manhattan
+from gett.plotting import manhattan
 from scipy.stats.kde import gaussian_kde
 import pickle
 
@@ -59,10 +59,10 @@ def mode_discovery(samp):
     return modes
 
 print 'Parsing expression files'
-caseheader, casegenenames, caseMexp = ett.io.read_expression_matrix(args.caseexpfile)
-controlheader, controlgenenames, controlMexp = ett.io.read_expression_matrix(args.controlexpfile)
+caseheader, casegenenames, caseMexp = gett.io.read_expression_matrix(args.caseexpfile)
+controlheader, controlgenenames, controlMexp = gett.io.read_expression_matrix(args.controlexpfile)
 print 'Parsing community files'
-casenodesbycluster, caseedgesbycluster = ett.io.read_community(args.casecommunityfile)
+casenodesbycluster, caseedgesbycluster = gett.io.read_community(args.casecommunityfile)
 
 all_case_nmodes = {}
 all_control_nmodes = {}

@@ -26,7 +26,7 @@ for i, g in enumerate(genecols):
         o.write(',')
     else:
         o.write('\n')
-print 'Starting seconda phase'
+print 'Number of probes'
 print len(probes)
 i = 0
 while True:
