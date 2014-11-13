@@ -1,6 +1,17 @@
 gett
 ====
 
+Install instructions
+-----
+
+* Download/clone from github: `git clone https://github.com/dimenwarper/gett.git`
+* Setup an environment variable `GETT_HOME that points to the directory where gett lives: export GETT_HOME:/path/to/gett/`
+* Change directory to `GETT_HOME` and do: `python setup.py install`
+* Do a test run by running the get command: `gett`
+
+How to run
+----
+
 The genotype, expression, and trait toolkit
 
 Main usage is through the gett executable, e.g. as follows
