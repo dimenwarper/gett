@@ -6,7 +6,6 @@ import scipy.sparse
 from collections import defaultdict
 from sklearn.linear_model import lars_path
 from sklearn import linear_model
-from gett.linear.lasso import generalized_lasso
 from gett.network_building.data_structures import SparseGraph
 from random import shuffle
 from matplotlib.pylab import *
@@ -66,7 +65,7 @@ def invcov_shrink(data_matrix, thresh=None):
     selected_indices = np.array([True if (res[i,:] != 0).sum() > 2 else False for i in xrange(p)])
     return selected_indices, res
 
-def joint_graphical_lasso(data_matrices, Lambda1, lambda2=0, return_whole_theta=False, mindegree=0, return_aic=False):
+def joint_graphical_lasso(data_matrices, Lambda1, lambda2=0, return_whole_theta=True, mindegree=0, return_aic=False, maxiter=500):
     p, n = data_matrices[0].shape[0], data_matrices[0].shape[1]
     
     if type(Lambda1) == float:
@@ -78,7 +77,7 @@ def joint_graphical_lasso(data_matrices, Lambda1, lambda2=0, return_whole_theta=
     else:
         print 'Type of penalty matrix not recognized'
 
-    matrix_list = [(str(i+1), _data_matrix_to_R(X)) for i, X in enumerate(data_matrices)]
+    matrix_list = [(str(i+1), _data_matrix_to_R(X.T)) for i, X in enumerate(data_matrices)]
     rmatrix_list = robjects.ListVector(dict(matrix_list))
 
     robjects.r('library(JGL)')
@@ -86,7 +85,7 @@ def joint_graphical_lasso(data_matrices, Lambda1, lambda2=0, return_whole_theta=
 
 
     print 'Calling JGL'
-    gobj = JGL(rmatrix_list, lambda1=rLambda1, lambda2=lambda2, return_whole_theta=return_whole_theta, maxiter=50, tol=0.001)
+    gobj = JGL(rmatrix_list, lambda1=rLambda1, lambda2=lambda2, return_whole_theta=return_whole_theta, maxiter=maxiter, tol=1e-5)
     if return_whole_theta:
         Thetas = [np.reshape(np.array(list(gobj[0][i])), [p, p]) for i in xrange(len(data_matrices))]
         selected_indices = np.array([True]*p)
@@ -122,63 +121,6 @@ def joint_graphical_lasso(data_matrices, Lambda1, lambda2=0, return_whole_theta=
     return selected_indices, sgraphs
 
 
-def centralized_graphical_lasso( X, D, alpha=0.01, max_iter = 100, convg_threshold=0.001 ):
-    """ This function computes the graphical lasso algorithm as outlined in Sparse inverse covariance estimation with the
-        graphical lasso (2007).
-        
-    inputs:
-        X: the data matrix, size (nxd)
-        alpha: the coefficient of penalization, higher values means more sparseness.
-        max_iter: maximum number of iterations
-        convg_threshold: Stop the algorithm when the duality gap is below a certain threshold.
-        
-    
-    
-    """
-    
-    if alpha == 0:
-        return cov_estimator(X)
-    n_features = X.shape[1]
-
-    mle_estimate_ = cov_estimator(X)
-    covariance_ = mle_estimate_.copy()
-    precision_ = np.linalg.pinv( mle_estimate_ )
-    indices = np.arange( n_features)
-    for i in xrange( max_iter):
-        for n in range( n_features ):
-            sub_estimate = covariance_[ indices != n ].T[ indices != n ]
-            row = mle_estimate_[ n, indices != n]
-            #solve the lasso problem
-            # Not now DAAAAAAAAARLING! lez do the generalized lasso instead
-            #_, _, coefs_ = lars_path( sub_estimate, row, Xy = row, Gram = sub_estimate, 
-            #                            alpha_min = alpha/(n_features-1.),
-            #                            method = "lars")
-            #coefs_ = coefs_[:,-1] #just the last please.
-            #clf = linear_model.Lasso(alpha=alpha)
-            #clf.fit(sub_estimate, row)
-            #coefs_ = clf.coef_
-            coefs_ = generalized_lasso(sub_estimate, row, D, alpha)
-	    #update the precision matrix.
-            precision_[n,n] = 1./( covariance_[n,n] 
-                                    - np.dot( covariance_[ indices != n, n ], coefs_  ))
-            precision_[indices != n, n] = - precision_[n, n] * coefs_
-            precision_[n, indices != n] = - precision_[n, n] * coefs_
-            temp_coefs = np.dot( sub_estimate, coefs_)
-            covariance_[ n, indices != n] = temp_coefs
-            covariance_[ indices!=n, n ] = temp_coefs
-
-        print 'Finished iteration %s' % i
-        #if test_convergence( old_estimate_, new_estimate_, mle_estimate_, convg_threshold):
-        if np.abs( _dual_gap( mle_estimate_, precision_, alpha ) )< convg_threshold:
-                break
-    else:
-        #this triggers if not break command occurs
-        print "The algorithm did not coverge. Try increasing the max number of iterations."
-    
-    return covariance_, precision_
-        
-        
-        
         
 def cov_estimator( X ):
     return np.cov( X.T) 
@@ -251,7 +193,7 @@ class LaplacianCLAM():
         self.ncomm_crit = ncomm_crit
 
     def _calculate_scale(self, S, ncomm):
-        #return max(10, sqrt(ncomm))
+        return max(10, sqrt(ncomm))
         return self.target_scale/abs(np.array(S.values())).mean()
         if ncomm < 100:
             return max(1, ncomm/20)
@@ -263,7 +205,6 @@ class LaplacianCLAM():
             num_comm_values = [num_comm]
         else:
             num_comm_values = self._get_num_comm_values_to_try(S)
-        num_comm_values = [70]
 
         calc_lhood = (len(num_comm_values) > 1)
 
@@ -299,7 +240,7 @@ class LaplacianCLAM():
                     curr_llhood = llhood
                     curr_F = F
         self.scale = self._calculate_scale(S, curr_F.shape[1])
-        return F
+        return curr_F
     
     def _calculate_membership_params(self, S, ncomm):
         # epsilon is the background probability of an edge
@@ -438,7 +379,7 @@ class LaplacianCLAM():
     def _get_num_comm_values_to_try(self, S):
         print 'Getting number of communities'
         limit = min(S.shape[0], 500)
-        return np.arange(10, limit, limit/7 - 1)
+        return np.arange(10, limit, limit/10 - 1)
         num_comm_range = np.arange(10, self.max_num_comm, 10)
         Z_zero, Z_non_zero = self._get_normalizing_constants(S, num_comm_range)
         E_zero = 0.5*self._num_comm_prior()/Z_zero.sum()
@@ -512,10 +453,11 @@ class CLIP():
         for niter in xrange(self.maxiter):
             # Calculate overlap matrices and community vectors for each trait matrix given precision matrix
             for i, Sinv in enumerate(prec_matrices):
-                comm_vectors[i] = self.community_detector(Sinv, num_comm=num_comms[i])
+                comm_vectors[i] = self.community_detector(Sinv)
                 comm_vectors[i] = self.community_detector.get_membership_vectors(Sinv, comm_vectors[i])
                 overlap_matrices[i] = self.community_detector.get_overlap_matrix(Sinv, comm_vectors[i])
-                penalty_matrices[i] = self.community_detector.scale*self.lambda1/overlap_matrices[i]
+                penalty_matrices[i] = self.lambda1/overlap_matrices[i]
+                print 'Penalty matrix statistics for %s: Mean %s, Max value %s, Min value %s' % (i, penalty_matrices[i].mean(), penalty_matrices[i].max(), penalty_matrices[i].min())
                 #if overlap_matrices[i].max() > 1:
                 #    overlap_matrices[i] = overlap_matrices[i]/overlap_matrices[i].max()
                 print 'Number of communities for %s: %s' % (i, comm_vectors[i].shape[1])

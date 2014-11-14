@@ -10,6 +10,7 @@ from mpl_toolkits.mplot3d import Axes3D
 
 parser = argparse.ArgumentParser()
 parser.add_argument('expfile', metavar='EXPRESSION_FILE', type=argparse.FileType('r'))
+parser.add_argument('edgefile', metavar='EDGE_FILE', type=argparse.FileType('r'))
 parser.add_argument('communityfile', metavar='COMMUNITY_FILE', type=argparse.FileType('r'))
 parser.add_argument('--encodefile', metavar='ENCODE_ANNOTATED_FILE', type=argparse.FileType('r'), default=None)
 parser.add_argument('--directedcommunityfile', metavar='DIRECTED_COMMUNITY_FILE', type=argparse.FileType('r'), default=None)
@@ -73,7 +74,7 @@ print 'Parsing expression file'
 header, genenames, Mexp = gett.io_utils.read_expression_matrix(args.expfile)
 geneids = [symbol2entrez[g] if g in symbol2entrez else 'NA' for g in genenames]
 print 'Parsing community file'
-nodesbycommunity, communities = gett.io_utils.read_community(args.communityfile)
+nodesbycommunity, communities = gett.io_utils.read_communities(args.communityfile, edgefile=args.edgefile)
 if args.directedcommunityfile:
     dnodesbycommunity, dcommunities = gett.io_utils.read_community(args.directedcommunityfile)
 

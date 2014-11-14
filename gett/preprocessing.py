@@ -1,13 +1,16 @@
+from __future__ import division
 import sys
 import pandas as pd
 import pdb
 import numpy as np
-import scipy.stats.mstats
+import scipy.stats
+import statsmodels.api as sm
 from scipy.stats import zscore
 from itertools import chain
-import statsmodels.api as sm
 from matplotlib.pylab import *
 from numpy.linalg import lstsq
+from scipy import interpolate
+
 
 def correct_covariates(Dtrait, Dcov, variables):
     Dcomb = pd.merge(Dtrait.T, Dcov.T, left_index=True, right_index=True).T
@@ -56,4 +59,9 @@ def select_traits_by_variance(Dtraits, frac=0.25):
 def zscores(D):
     for i in D.index:
         D.loc[i,:] = (D.loc[i,:] - D.loc[i,:].mean())/D.loc[i,:].std()
+    return D
+
+def boxcox_normalize(D):
+    for i in D.index:
+        D.loc[i,:], _ = scipy.stats.boxcox(D.loc[i,:])
     return D
