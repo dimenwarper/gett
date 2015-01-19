@@ -8,6 +8,7 @@ Install instructions
 * Setup an environment variable `GETT_HOME that points to the directory where gett lives: export GETT_HOME:/path/to/gett/`
 * Put `GETT_HOME/bin/` in your `PATH`: `export PATH=$PATH:$GETT_HOME/bin`
 * Change directory to `GETT_HOME` and do: `python setup.py install`
+* To run gene network inference algorithms that depend on the JGL package (e.g. clip), you need to install gett's version of JGL. To do this, change directory to `GETT_HOME/external` and do `R CMD INSTALL JGL`.
 * Do a test run by running the get command: `gett`
 
 How to run
