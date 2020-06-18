@@ -41,4 +41,4 @@ Format of input files
 
 Almost all files are tab-delimited.
 * For trait matrices, you have to have a header file with your sample names (tab-delimited), and then one row for each trait, that starts with your trait name (e.g. gene symbol for expression traits), and their values per samples (as in header), also tab-delim.
-* Covariate matrices have the same format as triat matrices.
+* Covariate matrices have the same format as trait matrices.
